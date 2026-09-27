@@ -1,2 +1,1 @@
-def main():
-    print("Running..")
+from .cli import app

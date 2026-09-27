@@ -4,10 +4,12 @@ version = "0.1.0"
 description = "Bundle your python application as a cross-platform executable zip app."
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "typer>=0.27.2",
+]
 
 [project.scripts]
-appzip = "appzip:main"
+appzip = "appzip:app"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13"]

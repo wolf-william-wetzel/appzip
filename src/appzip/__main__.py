@@ -1,2 +1,2 @@
-from appzip import main
-main()
+from .cli import app
+app()
