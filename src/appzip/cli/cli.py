@@ -57,7 +57,7 @@ def find_config(path: Path) -> Path:
         if config.exists() and os.access(config, os.R_OK):
             return config
     names = ", ".join("'{}'".format(name) for name in CONFIG_FILE_NAMES)
-    raise typer.BadParameter(f"{path} does not contain any of {names}.")
+    raise typer.BadParameter(f"{path} contains no readable file matching {names}.")
 
 
 # noinspection unused-parameter
