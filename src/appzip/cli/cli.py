@@ -46,38 +46,31 @@ def show_version(value: bool):
         raise typer.Exit()
 
 
-def find_config(folder: Path) -> Path:
-    """Return the path to a config file in ``folder``."""
-    for config in (folder / name for name in CONFIG_FILE_NAMES):
+def find_config(path: Path) -> Path:
+    """Search ``path`` for a config file and return it.
+
+    If ``path`` is a file, return it.
+    """
+    if path.is_file():
+        return path
+    for config in (path / name for name in CONFIG_FILE_NAMES):
         if config.exists() and os.access(config, os.R_OK):
             return config
     names = ", ".join("'{}'".format(name) for name in CONFIG_FILE_NAMES)
-    raise typer.BadParameter(f"{folder} does not contain any of {names}.")
-
-
-def load_config(path: Path):
-    """Find and load the config file."""
-    # Find the config file.
-    if path.is_dir():
-        path = find_config(path)
-    # Load the config file.
-    pass
-    # Return the configuration object.
-    return path
+    raise typer.BadParameter(f"{path} does not contain any of {names}.")
 
 
 # noinspection unused-parameter
 @app.command(epilog=EPILOG)
 def main(
-        config: Annotated[Path,
+        path: Annotated[Path,
             typer.Argument(
                 default_factory=Path.cwd,
                 show_default=".",
                 exists=True,
                 resolve_path=True,
                 help="Path to config file or project directory.",
-                callback=load_config,
-                metavar="path",
+                callback=find_config,
             )],
         version_flag: Annotated[bool,
             typer.Option("-v", "--version",
@@ -95,6 +88,8 @@ def main(
     """
     Pack a python app into a cross-platform zip file.
     """
+    # Load the configuration.
+    pass
     # Set up logging.
     if log_level is not LogLevel.NONE:
         rich_handler = RichHandler(level=log_level.value,
@@ -104,4 +99,4 @@ def main(
         rich_handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(rich_handler)
     # Pack the project.
-    log.info(config)
+    log.info(path)
