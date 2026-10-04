@@ -1,0 +1,12 @@
+[project]
+name = "testapp"
+version = "1.2.3"
+requires-python = ">=3.14"
+dependencies = [
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+testapp = "testproject:main"
+
+[tool.appzip]

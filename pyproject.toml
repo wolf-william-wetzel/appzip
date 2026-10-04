@@ -5,6 +5,7 @@ description = "Bundle your python application as a cross-platform executable zip
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "msgspec>=0.22.0",
     "typer>=0.27.2",
 ]
 

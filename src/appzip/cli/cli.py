@@ -6,7 +6,8 @@ from enum import StrEnum
 import os
 
 import typer
-from rich import print
+import msgspec
+from rich.console import Console
 from rich.logging import RichHandler
 
 
@@ -21,6 +22,8 @@ class LogLevel(StrEnum):
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=LogLevel.DEBUG, handlers=[])
+
+console = Console()
 
 app = typer.Typer(context_settings={"help_option_names": ["-h", "--help"]})
 
@@ -42,7 +45,7 @@ CONFIG_FILE_NAMES = (
 def show_version(value: bool):
     """Display app version."""
     if value:
-        print(__version__ or "[red]No version info found.[/]")
+        console.print(__version__ or "[red]No version info found.[/]")
         raise typer.Exit()
 
 
@@ -69,7 +72,7 @@ def main(
                 show_default=".",
                 exists=True,
                 resolve_path=True,
-                help="Path to config file or project directory.",
+                help="Path to config file or directory containing config file.",
                 callback=find_config,
             )],
         version_flag: Annotated[bool,
@@ -89,14 +92,19 @@ def main(
     Pack a python app into a cross-platform zip file.
     """
     # Load the configuration.
-    pass
+    with console.status(f"Reading {path}"):
+        with open(path, "rb") as file:
+            config = msgspec.toml.decode(file.read())
     # Set up logging.
     if log_level is not LogLevel.NONE:
         rich_handler = RichHandler(level=log_level.value,
+                                   console=console,
                                    rich_tracebacks=True,
                                    log_time_format="[%Y-%m-%d %H:%M:%S.%f]",
                                    )
         rich_handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(rich_handler)
     # Pack the project.
+    console.print(f"Loaded {path}")
+    console.print_json(data=config)
     log.info(path)
