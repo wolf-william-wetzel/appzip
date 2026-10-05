@@ -41,6 +41,12 @@ CONFIG_FILE_NAMES = (
     "pyproject.toml",
 )
 
+CONFIG_ERROR_MSG = """[red][link={path}]{path}[/link] {message}
+[bold]{exc}[/bold][/red]
+[magenta]{suggestion}[/magenta]"""
+DECODE_ERROR_TEXT = ("cannot be decoded", "Ensure the file is a valid TOML document.")
+VALIDATE_ERROR_TEXT = ("is not a valid config file", "Fix the above issue and try again.")
+
 
 def show_version(value: bool):
     """Display app version."""
@@ -91,10 +97,26 @@ def main(
     """
     Pack a python app into a cross-platform zip file.
     """
+
+    def throw_config_error(message: str, suggestion: str):
+        """Print error message and exit the program.
+
+        Must be called from an error scope where ``exc`` is an exception object.
+        """
+        console.print(CONFIG_ERROR_MSG.format(path=path, exc=exc, message=message, suggestion=suggestion))
+        raise typer.Exit(1) from None
+
     # Load the configuration.
-    with console.status(f"Reading {path}"):
+    with console.status(f"Loading config from {path}"):
         with open(path, "rb") as file:
-            config = msgspec.toml.decode(file.read())
+            try:
+                config = msgspec.toml.decode(file.read())
+            except msgspec.ValidationError as exc:
+                throw_config_error(*VALIDATE_ERROR_TEXT)
+            except msgspec.DecodeError as exc:
+                throw_config_error(*DECODE_ERROR_TEXT)
+            else:
+                console.print(f"Loaded config from [link={path}]{path}[/]")
     # Set up logging.
     if log_level is not LogLevel.NONE:
         rich_handler = RichHandler(level=log_level.value,
@@ -105,6 +127,5 @@ def main(
         rich_handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(rich_handler)
     # Pack the project.
-    console.print(f"Loaded {path}")
     console.print_json(data=config)
     log.info(path)
