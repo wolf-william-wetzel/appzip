@@ -10,6 +10,8 @@ import msgspec
 from rich.console import Console
 from rich.logging import RichHandler
 
+# from .config import Config
+
 
 class LogLevel(StrEnum):
     NONE = "NONE"
@@ -69,7 +71,6 @@ def find_config(path: Path) -> Path:
     raise typer.BadParameter(f"{path} contains no readable file matching {names}.")
 
 
-# noinspection unused-parameter
 @app.command(epilog=EPILOG)
 def main(
         path: Annotated[Path,
@@ -81,7 +82,7 @@ def main(
                 help="Path to config file or directory containing config file.",
                 callback=find_config,
             )],
-        version_flag: Annotated[bool,
+        _: Annotated[bool,
             typer.Option("-v", "--version",
                 callback=show_version,
                 is_eager=True,
