@@ -15,6 +15,8 @@ class BasePath(Path):
                 path = (cls.base_dir / path).resolve(True)
             except OSError:
                 raise ValueError(f"'{path}' does not exist or contains symlink loops") from None
+        if not path.is_dir():
+            raise ValueError(f"'{path}' is not a directory")
         # Validating a new base dir changes it for all relative paths.
         cls.base_dir = path
         return cls(path)
@@ -25,7 +27,7 @@ class RelPath(Path):
     @classmethod
     def validate(cls, obj: str):
         if Path(obj).is_absolute():
-            raise ValueError("'{path}' is absolute")
+            raise ValueError("'{path}' is not relative")
         return cls(BasePath.base_dir / obj).resolve()
 
 
