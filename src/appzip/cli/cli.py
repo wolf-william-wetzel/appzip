@@ -129,13 +129,25 @@ def main(
             throw_config_error(*DECODE_ERROR_TEXT)
         else:
             console.print(f"Loaded config from [link={path}]{path}[/]")
-    # Set up logging.
+    # Set up file logging.
+    file_handler = logging.FileHandler(
+        config.tool.appzip.build_dir / "build.log",
+        mode="w",
+        encoding="utf-8"
+    )
+    file_handler.setFormatter(logging.Formatter(
+        fmt="%(asctime)s.%(msecs)d %(levelname)s:%(filename)s:%(lineno)d %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    log.addHandler(file_handler)
+    # Set up console logging.
     if log_level is not LogLevel.NONE:
-        rich_handler = RichHandler(level=log_level.value,
-                                   console=console,
-                                   rich_tracebacks=True,
-                                   log_time_format="[%Y-%m-%d %H:%M:%S.%f]",
-                                   )
+        rich_handler = RichHandler(
+            level=log_level.value,
+            console=console,
+            rich_tracebacks=True,
+            log_time_format="[%Y-%m-%d %H:%M:%S.%f]",
+        )
         rich_handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(rich_handler)
     # Pack the project.

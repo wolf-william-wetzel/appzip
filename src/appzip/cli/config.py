@@ -3,15 +3,25 @@ from pathlib import Path
 from msgspec import Struct, field, toml
 
 
-def validate_dir(obj: str, strict: bool = False) -> Path:
-    """Perform directory validation."""
+def validate_dir(obj: str, create: bool = False) -> Path:
+    """Perform directory validation.
+
+    If the path exists and isn't a dir, an error is raised.
+    If ``create`` is ``True`` and the path doesn't exist, it will be created.
+    If ``create`` is ``False`` and the path doesn't exist, an error is raised.
+    """
     path = Path(obj).expanduser()
     if not path.is_absolute():
         path = BaseDirPath.base / path
-    if path.exists() and not path.is_dir():
-        raise ValueError(f"'{path}' is not a directory")
     try:
-        return path.resolve(strict)
+        if path.exists():
+            if not path.is_dir():
+                raise FileExistsError
+        elif create:
+            path.mkdir(parents=True, exist_ok=True)
+        return path.resolve(True)
+    except FileExistsError:
+        raise ValueError(f"'{path}' is not a directory") from None
     except OSError:
         raise ValueError(f"'{path}' does not exist or contains symlink loops") from None
 
@@ -23,7 +33,7 @@ class BaseDirPath(Path):
     @classmethod
     def validate(cls, obj: str):
         # Validating a new base dir changes it for all relative paths.
-        cls.base = (path := validate_dir(obj, True))
+        cls.base = (path := validate_dir(obj))
         return cls(path)
 
 
@@ -31,7 +41,7 @@ class DirPath(Path):
     """Type for a dir, used for decoder hook and validation."""
     @classmethod
     def validate(cls, obj: str):
-        return cls(validate_dir(obj))
+        return cls(validate_dir(obj, create=True))
 
 
 def dec_hook(type_: type, obj):
@@ -75,5 +85,5 @@ class Config(Base):
 def load_config(path: Path) -> Config:
     """Load a config object from the given file."""
     BaseDirPath.base = path.parent  # Set the base dir to the config location.
-    with open(path) as file:
+    with open(path, encoding="utf-8") as file:
         return toml.decode(file.read(), type=Config, dec_hook=dec_hook)
