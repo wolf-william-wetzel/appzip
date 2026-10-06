@@ -10,7 +10,7 @@ import msgspec
 from rich.console import Console
 from rich.logging import RichHandler
 
-# from .config import Config
+from .config import load_config
 
 
 class LogLevel(StrEnum):
@@ -109,9 +109,9 @@ def main(
 
     # Load the configuration.
     with console.status(f"Loading config from {path}"):
-        with open(path, "rb") as file:
+        with open(path) as file:
             try:
-                config = msgspec.toml.decode(file.read())
+                config = load_config(file.read())
             except msgspec.ValidationError as exc:
                 throw_config_error(*VALIDATE_ERROR_TEXT)
             except msgspec.DecodeError as exc:
@@ -128,5 +128,5 @@ def main(
         rich_handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(rich_handler)
     # Pack the project.
-    console.print_json(data=config)
+    console.print(config)
     log.info(path)

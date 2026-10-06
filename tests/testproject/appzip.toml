@@ -1,6 +1,7 @@
 [project]
 name = "testapp"
 version = "1.2.3"
+description = "Just a test project with minimal functionality."
 requires-python = ">=3.14"
 dependencies = [
     "requests>=2.34.2",
