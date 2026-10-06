@@ -3,40 +3,35 @@ from pathlib import Path
 from msgspec import Struct, field, toml
 
 
-class BasePath(Path):
-    """Type for the base directory, used for decoder hook and validation."""
-    base_dir: Path  # The directory relative paths should be relative to.
+def validate_dir(obj: str, strict: bool = False) -> Path:
+    """Perform directory validation."""
+    path = Path(obj).expanduser()
+    if not path.is_absolute():
+        path = BaseDirPath.base / path
+    if path.exists() and not path.is_dir():
+        raise ValueError(f"'{path}' is not a directory")
+    try:
+        return path.resolve(strict)
+    except OSError:
+        raise ValueError(f"'{path}' does not exist or contains symlink loops") from None
+
+
+class BaseDirPath(Path):
+    """Type for the base dir, used for decoder hook and validation."""
+    base: Path  # Global access to the base directory.
 
     @classmethod
     def validate(cls, obj: str):
-        path = Path(obj).expanduser()
-        if not path.is_absolute():
-            try:
-                path = (cls.base_dir / path).resolve(True)
-            except OSError:
-                raise ValueError(f"'{path}' does not exist or contains symlink loops") from None
-        if not path.is_dir():
-            raise ValueError(f"'{path}' is not a directory")
         # Validating a new base dir changes it for all relative paths.
-        cls.base_dir = path
+        cls.base = (path := validate_dir(obj, True))
         return cls(path)
 
 
-class RelPath(Path):
-    """Type for a path relative to base directory, used for decoder hook and validation."""
+class DirPath(Path):
+    """Type for a dir, used for decoder hook and validation."""
     @classmethod
     def validate(cls, obj: str):
-        if Path(obj).is_absolute():
-            raise ValueError("'{path}' is not relative")
-        return cls(BasePath.base_dir / obj).resolve()
-
-
-def factory[T](cls: type[T], *args, **kwargs):
-    """Create a factory function for creating validator objects.
-
-    ``*args`` and ``**kwargs`` are passed directly into the ``cls.validate`` method.
-    """
-    return lambda: cls.validate(*args, **kwargs)
+        return cls(validate_dir(obj))
 
 
 def dec_hook(type_: type, obj):
@@ -60,9 +55,11 @@ class Project(Base):
 
 
 class Appzip(Base):
-    base_dir: BasePath = field(default_factory=factory(BasePath, "."))
-    build_dir: RelPath = field(default_factory=factory(RelPath, "build"))
-    dist_dir: RelPath = field(default_factory=factory(RelPath, "dist"))
+    base_dir: BaseDirPath = field(default_factory=lambda: BaseDirPath.validate("."))
+    build_dir: DirPath = field(default_factory=lambda: DirPath.validate("build"))
+    dist_dir: DirPath = field(default_factory=lambda: DirPath.validate("dist"))
+    include: tuple[str, ...] = ("./**",)
+    exclude: tuple[str, ...] = ()
 
 
 class Tool(Base):
@@ -77,6 +74,6 @@ class Config(Base):
 
 def load_config(path: Path) -> Config:
     """Load a config object from the given file."""
-    BasePath.base_dir = path.parent  # Set the base dir to the config location.
+    BaseDirPath.base = path.parent  # Set the base dir to the config location.
     with open(path) as file:
         return toml.decode(file.read(), type=Config, dec_hook=dec_hook)
