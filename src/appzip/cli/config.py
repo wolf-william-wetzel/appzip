@@ -1,11 +1,15 @@
-from msgspec import Struct, field, toml
-import pathlib
 from pathlib import Path
+from types import SimpleNamespace
 
+from msgspec import Struct, field, toml
+
+
+# Load globals into namespace for pattern matching.
+ns = SimpleNamespace(globals())
 
 def dec_hook(type_: type, obj):
     match type_:
-        case pathlib.Path:
+        case ns.Path:
             return Path(obj).expanduser().resolve()
         case _:
             module = "" if type_.__module__ in (None, "builtins") else f"{type_.__module__}."
@@ -26,7 +30,7 @@ class Project(Base):
 
 
 class Appzip(Base):
-    basedir: str = "."
+    basedir: Path = field(default_factory=Path.cwd)
 
 
 class Tool(Base):
@@ -40,4 +44,5 @@ class Config(Base):
 
 
 def load_config(text: str) -> Config:
+    """Load a config object from the given text."""
     return toml.decode(text, type=Config, dec_hook=dec_hook)
