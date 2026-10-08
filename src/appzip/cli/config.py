@@ -1,6 +1,7 @@
 from pathlib import Path
+from annotationlib import get_annotations
 
-from msgspec import Struct, field, toml
+from msgspec import Struct, field, toml, ValidationError
 
 
 def validate_dir(obj: str, create: bool = False) -> Path:
@@ -57,7 +58,7 @@ class Base(Struct, frozen=True, rename="kebab"):
 
 
 class Project(Base):
-    name: str | None = None
+    name: str
     version: str | None = None
     description: str | None = None
     requires_python: str | None = None
@@ -65,6 +66,7 @@ class Project(Base):
 
 
 class Appzip(Base):
+    version: str | None = None
     base_dir: BaseDirPath = field(default_factory=lambda: BaseDirPath.validate("."))
     build_dir: DirPath = field(default_factory=lambda: DirPath.validate("build"))
     dist_dir: DirPath = field(default_factory=lambda: DirPath.validate("dist"))
@@ -76,14 +78,38 @@ class Tool(Base):
     appzip: Appzip = field(default_factory=Appzip)
 
 
-class Config(Base):
+class ConfigFile(Base):
     """Represents the entire configuration file."""
-    project: Project = field(default_factory=Project)
+    project: Project
     tool: Tool = field(default_factory=Tool)
+
+
+class Config:
+    name: str
+    version: str
+    description: str | None
+    requires_python: str | None
+    dependencies: list[str]
+    base_dir: Path
+    build_dir: Path
+    dist_dir: Path
+    include: tuple[str, ...]
+    exclude: tuple[str, ...]
+
+    def __init__(self, config: ConfigFile):
+        for name in get_annotations(self.__class__):
+            if (value := getattr(config.tool.appzip, name, None)) is None:
+                if (value := getattr(config.project, name, None)) is None:
+                    raise ValidationError(f"Field '{name}' not found in config")
+            setattr(self, name, value)
+
+    def __rich_repr__(self):
+        for name, value in vars(self).items():
+            yield name, value
 
 
 def load_config(path: Path) -> Config:
     """Load a config object from the given file."""
     BaseDirPath.base = path.parent  # Set the base dir to the config location.
     with open(path, encoding="utf-8") as file:
-        return toml.decode(file.read(), type=Config, dec_hook=dec_hook)
+        return Config(toml.decode(file.read(), type=ConfigFile, dec_hook=dec_hook))

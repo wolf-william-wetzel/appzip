@@ -131,7 +131,7 @@ def main(
             console.print(f"Loaded config from [link={path}]{path}[/]")
     # Set up file logging.
     file_handler = logging.FileHandler(
-        config.tool.appzip.build_dir / "build.log",
+        config.build_dir / "build.log",
         mode="w",
         encoding="utf-8"
     )
@@ -152,4 +152,4 @@ def main(
         log.addHandler(rich_handler)
     # Pack the project.
     log.info(f"Config path: {path}")
-    log.debug(f"Config: {pretty_repr(config, indent_size=2)}")
+    log.debug(pretty_repr(config, indent_size=2))
