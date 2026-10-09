@@ -70,7 +70,7 @@ class Appzip(Base):
     base_dir: BaseDirPath = field(default_factory=lambda: BaseDirPath.validate("."))
     build_dir: DirPath = field(default_factory=lambda: DirPath.validate("build"))
     dist_dir: DirPath = field(default_factory=lambda: DirPath.validate("dist"))
-    include: tuple[str, ...] = ("./**",)
+    include: tuple[str, ...] = ("**",)
     exclude: tuple[str, ...] = ()
 
 

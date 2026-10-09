@@ -4,6 +4,7 @@ from importlib.metadata import version, PackageNotFoundError
 import logging
 from enum import StrEnum
 import os
+import shutil
 
 import typer
 from typer.rich_utils import STYLE_OPTION_ENVVAR, STYLE_OPTION_DEFAULT
@@ -13,6 +14,7 @@ from rich.logging import RichHandler
 from rich.pretty import pretty_repr
 
 from .config import load_config
+from .packer import copy_app
 
 
 class LogLevel(StrEnum):
@@ -24,7 +26,7 @@ class LogLevel(StrEnum):
     CRITICAL = "CRITICAL"
 
 
-log = logging.getLogger(__name__)
+log = logging.getLogger()
 logging.basicConfig(level=LogLevel.DEBUG, handlers=[])
 
 console = Console()
@@ -150,6 +152,15 @@ def main(
         )
         rich_handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(rich_handler)
-    # Pack the project.
     log.info(f"Config path: {path}")
     log.debug(pretty_repr(config, indent_size=2))
+    # Get and clear the build directory.
+    app_name = f"{config.name}_{config.version}_installer"
+    dest_dir = config.build_dir / app_name
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
+    # Copy the app.
+    with console.status("Copying files"):
+        copy_app(config.base_dir, dest_dir, config.include, config.exclude)
+    console.print(f"Files copied into [link={dest_dir}]{dest_dir}[/]")
+    log.info(f"Files copied: {dest_dir}")
