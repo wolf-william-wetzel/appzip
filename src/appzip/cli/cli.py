@@ -36,14 +36,16 @@ app = typer.Typer(
     add_completion=False,
 )
 
+LINK_STR = "[link={0}]{0}[/]"
+
 REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
 EPILOG = f"""This software is free and open source.
-[blue][link={REPO_LINK}]{REPO_LINK}[/]"""
+[blue]{LINK_STR.format(REPO_LINK)}[/]"""
 
 LOG_HELP_TEXT = (
     "Show logs in console. "
-    f"If env var [{STYLE_OPTION_ENVVAR}]\\[DEBUG][/] is set, "
-    f"default to [{STYLE_OPTION_DEFAULT}]\\[DEBUG][/]."
+    fr"If env var [{STYLE_OPTION_ENVVAR}]\[DEBUG][/] is set, "
+    fr"default to [{STYLE_OPTION_DEFAULT}]\[DEBUG][/]."
 )
 
 CONFIG_FILE_NAMES = (
@@ -51,11 +53,15 @@ CONFIG_FILE_NAMES = (
     "pyproject.toml",
 )
 
-CONFIG_ERROR_MSG = """[red][link={path}]{path}[/link] {message}
+ERROR_TEXT = """[red]{msg}
 [bold]{exc}[/bold][/red]
 [magenta]{suggestion}[/magenta]"""
-DECODE_ERROR_TEXT = ("cannot be decoded", "Ensure the file is a valid TOML document.")
-VALIDATE_ERROR_TEXT = ("is not a valid config file", "Fix the above issue and try again.")
+
+
+def throw_error(msg: str, exc: BaseException, suggestion: str = ""):
+    """Display user-friendly errors."""
+    console.print(ERROR_TEXT.format(msg=msg, exc=exc, suggestion=suggestion))
+    raise typer.Exit(1) from None
 
 
 def show_version(value: bool):
@@ -112,25 +118,20 @@ def main(
     """
     Pack a python app into a cross-platform zip file.
     """
-
-    def throw_config_error(message: str, suggestion: str):
-        """Print error message and exit the program.
-
-        Must be called from an error scope where ``exc`` is an exception object.
-        """
-        console.print(CONFIG_ERROR_MSG.format(path=path, exc=exc, message=message, suggestion=suggestion))
-        raise typer.Exit(1) from None
-
     # Load the configuration.
+    path_str = LINK_STR.format(path)
     with console.status(f"Loading config from {path}"):
         try:
             config = load_config(path)
         except msgspec.ValidationError as exc:
-            throw_config_error(*VALIDATE_ERROR_TEXT)
+            throw_error(f"{path_str} is not a valid config file", exc,
+                        "Fix the above issue and try again.")
         except msgspec.DecodeError as exc:
-            throw_config_error(*DECODE_ERROR_TEXT)
+            throw_error(f"{path_str} cannot be decoded", exc,
+                        "Ensure the file is a valid TOML document.")
         else:
-            console.print(f"Loaded config from [link={path}]{path}[/]")
+            console.print(f"Loaded config from {path_str}")
+
     # Set up file logging.
     file_handler = logging.FileHandler(
         config.build_dir / "build.log",
@@ -152,15 +153,21 @@ def main(
         )
         rich_handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(rich_handler)
+    # Log details.
     log.info(f"Config path: {path}")
-    log.debug(pretty_repr(config, indent_size=2))
-    # Get and clear the build directory.
-    app_name = f"{config.name}_{config.version}_installer"
-    dest_dir = config.build_dir / app_name
+    log.info(pretty_repr(config, indent_size=2))
+
+    # Get the build directory.
+    installer_name = f"{config.name}_{config.version}_installer"
+    dest_dir = config.build_dir / installer_name
+    # Clear the build directory.
     if dest_dir.exists():
-        shutil.rmtree(dest_dir)
+        shutil.rmtree(dest_dir,
+                      onexc=lambda _, name, err:
+                      throw_error(f"{LINK_STR.format(name)} cannot be deleted", err,
+                                  f"Clear all files from {LINK_STR.format(dest_dir)}"))
     # Copy the app.
     with console.status("Copying files"):
         copy_app(config.base_dir, dest_dir, config.include, config.exclude)
-    console.print(f"Files copied into [link={dest_dir}]{dest_dir}[/]")
+    console.print(f"Files copied into {LINK_STR.format(dest_dir)}")
     log.info(f"Files copied: {dest_dir}")
