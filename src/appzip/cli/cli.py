@@ -15,9 +15,19 @@ import msgspec
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.pretty import pretty_repr
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    MofNCompleteColumn,
+    TaskProgressColumn,
+    TimeRemainingColumn,
+    TimeElapsedColumn,
+)
 
 from .config import load_config
-from .packer import copy_app
+from .packer import scan_dir, copy_node
 
 START_TIME = time.perf_counter_ns()
 
@@ -189,16 +199,37 @@ def main(
     dest_dir = config.build_dir / installer_name
     # Clear the build directory.
     if dest_dir.exists():
-        shutil.rmtree(dest_dir,
-                      onexc=lambda _, name, err:
-                      throw_error(f"{make_rel(name)} cannot be deleted", err,
-                                  f"Clear all files from {link(dest_dir)}"))
+        with console.status("Clearing previous build"):
+            shutil.rmtree(dest_dir,
+                          onexc=lambda _, name, err:
+                          throw_error(f"{make_rel(name)} cannot be deleted", err,
+                                      f"Clear all files from {link(dest_dir)}"))
+    # Scan the project files.
+    log.info(f"Scanning {make_rel(config.base_dir)}")
+    with console.status("Scanning files"):
+        nodes = scan_dir(config.base_dir, config.include, config.exclude)
+    log.debug(f"Scanned {len(nodes)} nodes")
     # Copy the project files.
     log.info(f"Copying files to {make_rel(dest_dir)}")
-    with console.status("Copying files"):
-        copy_app(config.base_dir, dest_dir, config.include, config.exclude)
-    log.info(f"Copying complete")
+    with Progress(
+        SpinnerColumn(),  # noqa
+        TextColumn("{task.description}"),  # noqa
+        TimeElapsedColumn(),  # noqa
+        BarColumn(style="bright_black", complete_style="bright_green"),  # noqa
+        TimeRemainingColumn(),  # noqa
+        MofNCompleteColumn(),  # noqa
+        TaskProgressColumn(),  # noqa
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Copying files", total=len(nodes))
+        while not progress.finished:
+            copy_node(config.base_dir, dest_dir, nodes.pop())
+            progress.update(task, advance=1)
     # Print exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
+    installer_path = config.dist_dir / (installer_name + ".pyz")
+    log.debug(f"Finished in {runtime}")
+    log.debug(f"Installer path: {make_rel(installer_path)}")
     console.print(f"[dim]Process completed in [cyan]{runtime}[/][/]")
-    console.print(f"Packed project: {link(config.dist_dir / (installer_name + ".pyz"))}")
+    console.print(f"Packed project: [bright_yellow]{link(installer_path)}[/]")

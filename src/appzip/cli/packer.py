@@ -10,40 +10,43 @@ def parents_ok(node: Path, excluded: set[Path]) -> bool:
     return all((p not in excluded and not p.is_symlink()) for p in node.parents)
 
 
-def copy_app(src_dir: Path, dest_dir: Path, include: tuple[str, ...], exclude: tuple[str, ...]):
-    """Copy the app from ``src_dir`` to ``dest_dir``, respecting the pattern matches."""
-    included_nodes: set[Path] = {src_dir}
+def scan_dir(folder: Path, include: tuple[str, ...], exclude: tuple[str, ...]) -> set[Path]:
+    """Scan ``path`` and return all nodes matching ``include`` and not ``exclude``."""
+    included_nodes: set[Path] = {folder}
     excluded_nodes: set[Path] = set()
 
     for pattern in include:
-        included_nodes.update(src_dir.glob(pattern, recurse_symlinks=True))
+        included_nodes.update(folder.glob(pattern, recurse_symlinks=True))
     for pattern in exclude:
-        excluded_nodes.update(src_dir.glob(pattern, recurse_symlinks=True))
+        excluded_nodes.update(folder.glob(pattern, recurse_symlinks=True))
 
-    for src_node in (n for n in (included_nodes - excluded_nodes) if parents_ok(n, excluded_nodes)):
-        rel_node = src_node.relative_to(src_dir)
-        dest_node = dest_dir / rel_node
+    return {n for n in (included_nodes - excluded_nodes) if parents_ok(n, excluded_nodes)}
 
-        if not dest_node.parent.exists():
-            dest_node.parent.mkdir(parents=True, exist_ok=True)
 
-        if src_node.is_symlink():
-            real_node = src_node.resolve()
-            if src_dir not in real_node.parents:
-                log.debug(f"External symlink, ignored: {rel_node}")
-                continue
-            dest_node.symlink_to(real_node.relative_to(src_node.parent, walk_up=True), real_node.is_dir())
-        elif src_node.is_dir():
-            dest_node.mkdir(exist_ok=True)
-            src_mode = src_node.stat().st_mode
-            if dest_node.stat().st_mode != src_mode:
-                dest_node.chmod(src_mode)
-        elif src_node.is_file():
-            try:
-                dest_node.hardlink_to(src_node)
-            except UnsupportedOperation:
-                src_node.copy(dest_node, preserve_metadata=True)
-        else:
-            log.debug(f"Unknown file type, ignored: {rel_node}")
-            continue
-        log.debug(f"Copied: {rel_node}")
+def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
+    rel_node = src_node.relative_to(src_dir)
+    dest_node = dest_dir / rel_node
+
+    if not dest_node.parent.exists():
+        dest_node.parent.mkdir(parents=True, exist_ok=True)
+
+    if src_node.is_symlink():
+        real_node = src_node.resolve()
+        if src_dir not in real_node.parents:
+            log.debug(f"External symlink, ignored: {rel_node}")
+            return
+        dest_node.symlink_to(real_node.relative_to(src_node.parent, walk_up=True), real_node.is_dir())
+    elif src_node.is_dir():
+        dest_node.mkdir(exist_ok=True)
+        src_mode = src_node.stat().st_mode
+        if dest_node.stat().st_mode != src_mode:
+            dest_node.chmod(src_mode)
+    elif src_node.is_file():
+        try:
+            dest_node.hardlink_to(src_node)
+        except UnsupportedOperation:
+            src_node.copy(dest_node, preserve_metadata=True)
+    else:
+        log.debug(f"Unknown file type, ignored: {rel_node}")
+        return
+    log.debug(f"Copied: {rel_node}")
