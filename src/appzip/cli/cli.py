@@ -23,6 +23,7 @@ from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
     TimeRemainingColumn,
+    TaskProgressColumn,
 )
 
 from .config import load_config
@@ -54,16 +55,30 @@ PROGRESS_COLUMNS = (
     TextColumn("[progress.description]{task.description}"),  # noqa
     BarColumn(),  # noqa
     MofNCompleteColumn(),  # noqa
+    TaskProgressColumn(),  # noqa
     TimeRemainingColumn(compact=True, elapsed_when_finished=True),  # noqa
 )
 
 console_theme = Theme({
     # Change bar themes to ANSI colors.
-    "bar.back": "bright_black",
+    "bar.back": "dim bright_black",
     "bar.complete": "bright_green",
     "bar.finished": "green",
     "bar.pulse": "bright_green",
     # Modify other defaults.
+    "progress.percentage": "bright_green",
+    # Custom styles.
+    "installer.text": "default",
+    "installer.path": "yellow",
+    "installer.filename": "bright_yellow",
+    "finished": "dim",
+    "finished.time": "cyan",
+    "version.number": "bold cyan",
+    "version.error": "bold red",
+    "error.msg": "red",
+    "error.exc": "red bold",
+    "error.suggestion": "magenta",
+    # "": "",
 })
 
 console = Console(
@@ -110,9 +125,9 @@ CONFIG_FILE_NAMES = (
     "pyproject.toml",
 )
 
-ERROR_TEXT = """[red]{msg}
-[bold]{exc}[/bold][/red]
-[magenta]{suggestion}[/magenta]"""
+ERROR_TEXT = """[error.msg]{msg}[/]
+[error.exc]{exc}[/]
+[error.suggestion]{suggestion}[/]"""
 
 
 def throw_error(msg: str, exc: BaseException, suggestion: str = ""):
@@ -126,9 +141,9 @@ def show_version(value: bool):
     """Display app version."""
     if value:
         try:
-            console.print(f"[bold cyan]{version("appzip")}[/]")
+            console.print(f"[version.number]{version("appzip")}[/]")
         except PackageNotFoundError:
-            console.print("[bold red]No version info found.[/]")
+            console.print("[version.error]No version info found.[/]")
         raise typer.Exit()
 
 
@@ -143,7 +158,7 @@ def find_config(path: Path) -> Path:
         if config.exists() and os.access(config, os.R_OK):
             return config
     names = ", ".join("'{}'".format(name) for name in CONFIG_FILE_NAMES)
-    raise typer.BadParameter(f"{path} contains no readable file matching {names}.")
+    raise typer.BadParameter(f"'{make_rel(path)}' contains no readable file matching {names}.")
 
 
 @app.command(epilog=EPILOG)
@@ -177,7 +192,7 @@ def main(
     Pack a python app into a cross-platform zip file.
     """
     # Load the configuration.
-    with console.status(f"Loading configuration"):
+    with console.status("Loading configuration"):
         try:
             cfg = load_config(path)
         except ValidationError as exc:
@@ -243,7 +258,7 @@ def main(
     # Print exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
     log.debug(f"Finished in {runtime}")
-    console.print(f"[dim]Finished in [cyan]{runtime}[/][/]")
-    console.print(f"Installer: "
-                  f"[yellow]{link(cfg.installer_path.parent)}/[/]"
-                  f"[bright_yellow]{link(cfg.installer_path, cfg.installer_path.name)}[/]")
+    console.print(f"[finished]Finished in [finished.time]{runtime}[/][/]")
+    console.print(f"[installer.text]Installer: [/]"
+                  f"[installer.path]{link(cfg.installer_path.parent)}/[/]"
+                  f"[installer.filename]{link(cfg.installer_path, cfg.installer_path.name)}[/]")
