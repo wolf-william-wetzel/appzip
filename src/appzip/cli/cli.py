@@ -41,8 +41,14 @@ class LogLevel(StrEnum):
 
 
 log = logging.getLogger()
-logging.basicConfig(level=LogLevel.DEBUG, handlers=[])
-LOG_READY = False
+logging.basicConfig(level=LogLevel.DEBUG, handlers=[logging.NullHandler()])
+
+
+def add_handler(handler: logging.Handler, fmt: str, datefmt: str | None = None):
+    """Add ``handler`` with formatting to logger."""
+    handler.setFormatter(logging.Formatter(fmt, datefmt))
+    log.addHandler(handler)
+
 
 PROGRESS_COLUMNS = (
     TextColumn("[progress.description]{task.description}"),  # noqa
@@ -111,7 +117,7 @@ ERROR_TEXT = """[red]{msg}
 
 def throw_error(msg: str, exc: BaseException, suggestion: str = ""):
     """Display user-friendly errors."""
-    if LOG_READY: log.critical(msg, exc_info=exc)
+    log.critical(msg, exc_info=exc)
     console.print(ERROR_TEXT.format(msg=msg, exc=exc, suggestion=suggestion))
     raise typer.Exit(1) from None
 
@@ -182,31 +188,29 @@ def main(
                         "Ensure the file is a valid TOML document.")
 
     # Set up file logging.
-    file_handler = logging.FileHandler(
-        cfg.log_file,
-        mode="w",
-        encoding="utf-8"
+    add_handler(
+        logging.FileHandler(
+            cfg.log_file,
+            mode="w",
+            encoding="utf-8"
+        ),
+        "%(asctime)s.%(msecs)d %(filename)s:%(lineno)d:%(levelname)s %(message)s",
+        "%Y-%m-%d %H:%M:%S"
     )
-    file_handler.setFormatter(logging.Formatter(
-        fmt="%(asctime)s.%(msecs)d %(filename)s:%(lineno)d:%(levelname)s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
-    log.addHandler(file_handler)
     # Set up console logging.
     if log_level is not LogLevel.NONE:
-        rich_handler = RichHandler(
-            level=log_level.value,
-            console=console,
-            rich_tracebacks=True,
-            log_time_format="[%H:%M:%S.%f]",
-            show_path=False,
+        add_handler(
+            RichHandler(
+                level=log_level.value,
+                console=console,
+                rich_tracebacks=True,
+                log_time_format="[%H:%M:%S.%f]",
+                show_path=False,
+            ),
+            "%(message)s"
         )
-        rich_handler.setFormatter(logging.Formatter("%(message)s"))
-        log.addHandler(rich_handler)
 
     # Log details.
-    global LOG_READY
-    LOG_READY = True
     log.info(f"Log file: {make_rel(cfg.log_file)}")
     log.info(f"Config file: {make_rel(path)}")
     log.debug(pretty_repr(cfg, indent_size=2))
