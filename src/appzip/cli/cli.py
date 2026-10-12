@@ -8,22 +8,21 @@ import shutil
 from functools import cache
 import time
 import datetime as dt
+import zipapp
 
 import typer
 from typer.rich_utils import STYLE_OPTION_ENVVAR, STYLE_OPTION_DEFAULT
-import msgspec
+from msgspec import ValidationError, DecodeError
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.pretty import pretty_repr
+from rich.theme import Theme
 from rich.progress import (
     Progress,
-    SpinnerColumn,
     TextColumn,
     BarColumn,
     MofNCompleteColumn,
-    TaskProgressColumn,
     TimeRemainingColumn,
-    TimeElapsedColumn,
 )
 
 from .config import load_config
@@ -45,7 +44,26 @@ log = logging.getLogger()
 logging.basicConfig(level=LogLevel.DEBUG, handlers=[])
 LOG_READY = False
 
-console = Console(highlight=False)
+PROGRESS_COLUMNS = (
+    TextColumn("[progress.description]{task.description}"),  # noqa
+    BarColumn(),  # noqa
+    MofNCompleteColumn(),  # noqa
+    TimeRemainingColumn(compact=True, elapsed_when_finished=True),  # noqa
+)
+
+console_theme = Theme({
+    # Change bar themes to ANSI colors.
+    "bar.back": "bright_black",
+    "bar.complete": "bright_green",
+    "bar.finished": "green",
+    "bar.pulse": "bright_green",
+    # Modify other defaults.
+})
+
+console = Console(
+    highlight=False,
+    theme=console_theme,
+)
 
 app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -58,8 +76,8 @@ def make_rel(path: str | Path) -> str:
     """If ``path`` is relative to cwd, return ``path`` relative to cwd. Otherwise, return ``path``."""
     path, cwd = Path(path), Path.cwd()
     if path.is_relative_to(cwd):
-        return f".{os.path.sep}{path.relative_to(cwd)}"
-    return str(path)
+        return "./" + path.relative_to(cwd).as_posix()
+    return path.as_posix()
 
 
 @cache
@@ -73,7 +91,7 @@ def link(path: str | Path, text: str = "") -> str:
 
 REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
 EPILOG = f"""This software is free and open source.
-[blue][link={REPO_LINK}]{REPO_LINK}[/][/]"""
+[bright_blue link={REPO_LINK}]{REPO_LINK}[/]"""
 
 LOG_HELP_TEXT = (
     "Show logs in console. "
@@ -93,8 +111,8 @@ ERROR_TEXT = """[red]{msg}
 
 def throw_error(msg: str, exc: BaseException, suggestion: str = ""):
     """Display user-friendly errors."""
+    if LOG_READY: log.critical(msg, exc_info=exc)
     console.print(ERROR_TEXT.format(msg=msg, exc=exc, suggestion=suggestion))
-    if LOG_READY: log.exception(msg, exc_info=exc)
     raise typer.Exit(1) from None
 
 
@@ -155,18 +173,17 @@ def main(
     # Load the configuration.
     with console.status(f"Loading configuration"):
         try:
-            config = load_config(path)
-        except msgspec.ValidationError as exc:
+            cfg = load_config(path)
+        except ValidationError as exc:
             throw_error(f"{link(path)} is not a valid config file", exc,
                         "Fix the above issue and try again.")
-        except msgspec.DecodeError as exc:
+        except DecodeError as exc:
             throw_error(f"{link(path)} cannot be decoded", exc,
                         "Ensure the file is a valid TOML document.")
 
     # Set up file logging.
-    log_file = config.build_dir / "build.log"
     file_handler = logging.FileHandler(
-        log_file,
+        cfg.log_file,
         mode="w",
         encoding="utf-8"
     )
@@ -181,7 +198,7 @@ def main(
             level=log_level.value,
             console=console,
             rich_tracebacks=True,
-            log_time_format="[%H:%M:%S]",
+            log_time_format="[%H:%M:%S.%f]",
             show_path=False,
         )
         rich_handler.setFormatter(logging.Formatter("%(message)s"))
@@ -190,46 +207,39 @@ def main(
     # Log details.
     global LOG_READY
     LOG_READY = True
-    log.info(f"Log file: {make_rel(log_file)}")
+    log.info(f"Log file: {make_rel(cfg.log_file)}")
     log.info(f"Config file: {make_rel(path)}")
-    log.debug(pretty_repr(config, indent_size=2))
+    log.debug(pretty_repr(cfg, indent_size=2))
 
-    # Get the build directory.
-    installer_name = f"{config.name}_{config.version}_installer"
-    dest_dir = config.build_dir / installer_name
     # Clear the build directory.
-    if dest_dir.exists():
+    if cfg.dest_dir.exists():
+        log.info(f"Clearing previous build from {make_rel(cfg.dest_dir)}")
         with console.status("Clearing previous build"):
-            shutil.rmtree(dest_dir,
+            shutil.rmtree(cfg.dest_dir,
                           onexc=lambda _, name, err:
-                          throw_error(f"{make_rel(name)} cannot be deleted", err,
-                                      f"Clear all files from {link(dest_dir)}"))
+                          throw_error(f"Cannot delete {name}", err,
+                                      f"Clear all files from {link(cfg.dest_dir)}"))
+
     # Scan the project files.
-    log.info(f"Scanning {make_rel(config.base_dir)}")
+    log.info(f"Scanning {make_rel(cfg.base_dir)}")
     with console.status("Scanning files"):
-        nodes = scan_dir(config.base_dir, config.include, config.exclude)
-    log.debug(f"Scanned {len(nodes)} nodes")
+        nodes = scan_dir(cfg.base_dir, cfg.include, cfg.exclude)
+
     # Copy the project files.
-    log.info(f"Copying files to {make_rel(dest_dir)}")
-    with Progress(
-        SpinnerColumn(),  # noqa
-        TextColumn("{task.description}"),  # noqa
-        TimeElapsedColumn(),  # noqa
-        BarColumn(style="bright_black", complete_style="bright_green"),  # noqa
-        TimeRemainingColumn(),  # noqa
-        MofNCompleteColumn(),  # noqa
-        TaskProgressColumn(),  # noqa
-        console=console,
-        transient=True,
-    ) as progress:
-        task = progress.add_task("Copying files", total=len(nodes))
-        while not progress.finished:
-            copy_node(config.base_dir, dest_dir, nodes.pop())
-            progress.update(task, advance=1)
+    log.info(f"Copying {len(nodes)} nodes to {make_rel(cfg.dest_dir)}")
+    with Progress(*PROGRESS_COLUMNS, console=console, transient=True) as progress:
+        for node in progress.track(nodes, description="Copying files"):
+            copy_node(cfg.base_dir, cfg.dest_dir, node)
+
+    # Zip the project.
+    log.info(f"Zipping installer to {make_rel(cfg.installer_path)}")
+    with console.status("Zipping installer"):
+        zipapp.create_archive(cfg.dest_dir, cfg.installer_path, compressed=True)
+
     # Print exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
-    installer_path = config.dist_dir / (installer_name + ".pyz")
     log.debug(f"Finished in {runtime}")
-    log.debug(f"Installer path: {make_rel(installer_path)}")
-    console.print(f"[dim]Process completed in [cyan]{runtime}[/][/]")
-    console.print(f"Packed project: [bright_yellow]{link(installer_path)}[/]")
+    console.print(f"[dim]Finished in [cyan]{runtime}[/][/]")
+    console.print(f"Installer: "
+                  f"[yellow]{link(cfg.installer_path.parent)}/[/]"
+                  f"[bright_yellow]{link(cfg.installer_path, cfg.installer_path.name)}[/]")

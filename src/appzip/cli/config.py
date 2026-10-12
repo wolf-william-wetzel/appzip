@@ -84,7 +84,14 @@ class ConfigFile(Base):
     tool: Tool = field(default_factory=Tool)
 
 
-class Config:
+class GenConfig:
+    """Generated configuration values."""
+    log_file: Path
+    installer_path: Path
+    dest_dir: Path
+
+
+class Config(GenConfig):
     name: str
     version: str
     description: str | None
@@ -97,11 +104,24 @@ class Config:
     exclude: tuple[str, ...]
 
     def __init__(self, config: ConfigFile):
+        # Load values from config file.
         for name in get_annotations(self.__class__):
-            if (value := getattr(config.tool.appzip, name, None)) is None:
-                if (value := getattr(config.project, name, None)) is None:
-                    raise ValidationError(f"Field '{name}' not found in config")
-            setattr(self, name, value)
+            self.set_attr_from_config(name, config.tool.appzip, config.project)
+        # Calculate generated values.
+        self.log_file = self.build_dir / "build.log"
+        self.installer_path = self.dist_dir / f"{self.name}_{self.version}_installer.pyz"
+        self.dest_dir = self.build_dir / self.installer_path.stem
+
+    def set_attr_from_config(self, name: str, *tables: Struct):
+        """Set attribute ``name`` from ``tables``, searching sequentially.
+
+        Raise ``ValidationError`` if ``name`` isn't found.
+        """
+        for table in tables:
+            if (value := getattr(table, name, None)) is not None:
+                setattr(self, name, value)
+                return
+        raise ValidationError(f"Field '{name}' not found in config")
 
     def __rich_repr__(self):
         for name, value in vars(self).items():
