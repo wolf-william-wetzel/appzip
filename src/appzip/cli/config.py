@@ -71,7 +71,7 @@ class Appzip(Base):
     build_dir: DirPath = field(default_factory=lambda: DirPath.validate("build"))
     dist_dir: DirPath = field(default_factory=lambda: DirPath.validate("dist"))
     include: tuple[str, ...] = ("**",)
-    exclude: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ("build", "dist")
 
 
 class Tool(Base):

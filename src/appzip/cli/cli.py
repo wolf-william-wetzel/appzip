@@ -5,7 +5,6 @@ import logging
 from enum import StrEnum
 import os
 import shutil
-from functools import cache
 import time
 import datetime as dt
 import zipapp
@@ -28,6 +27,7 @@ from rich.progress import (
 
 from .config import load_config
 from .packer import scan_dir, copy_node
+from .utils import format_path
 
 START_TIME = time.perf_counter_ns()
 
@@ -67,6 +67,10 @@ console_theme = Theme({
     "bar.pulse": "bright_green",
     # Modify other defaults.
     "progress.percentage": "bright_green",
+    "logging.keyword": "bold bright_cyan",
+    "logging.level.warning": "bright_yellow",
+    "logging.level.error": "bold bright_red",
+    "logging.level.critical": "reverse bold bright_red",
     # Custom styles.
     "installer.text": "default",
     "installer.path": "yellow",
@@ -92,22 +96,12 @@ app = typer.Typer(
 )
 
 
-@cache
-def make_rel(path: str | Path) -> str:
-    """If ``path`` is relative to cwd, return ``path`` relative to cwd. Otherwise, return ``path``."""
-    path, cwd = Path(path), Path.cwd()
-    if path.is_relative_to(cwd):
-        return "./" + path.relative_to(cwd).as_posix()
-    return path.as_posix()
-
-
-@cache
 def link(path: str | Path, text: str = "") -> str:
     """Return rich markup linking ``text`` to ``path``.
 
-    If ``text`` isn't given, it will be ``path`` or an equivalent path relative to cwd.
+    If ``text`` is the empty string, it becomes formatted ``path``.
     """
-    return f"[link={path}]{text if text else make_rel(path)}[/]"
+    return f"[link={path}]{text if text else format_path(Path(path))}[/]"
 
 
 REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
@@ -158,7 +152,7 @@ def find_config(path: Path) -> Path:
         if config.exists() and os.access(config, os.R_OK):
             return config
     names = ", ".join("'{}'".format(name) for name in CONFIG_FILE_NAMES)
-    raise typer.BadParameter(f"'{make_rel(path)}' contains no readable file matching {names}.")
+    raise typer.BadParameter(f"'{format_path(path)}' contains no readable file matching {names}.")
 
 
 @app.command(epilog=EPILOG)
@@ -221,37 +215,38 @@ def main(
                 rich_tracebacks=True,
                 log_time_format="[%H:%M:%S.%f]",
                 show_path=False,
+                keywords=["COPIED", "IGNORED"],
             ),
             "%(message)s"
         )
 
-    # Log details.
-    log.info(f"Log file: {make_rel(cfg.log_file)}")
-    log.info(f"Config file: {make_rel(path)}")
+    # Log config details.
+    log.info(f"Config file: {format_path(path)}")
     log.debug(pretty_repr(cfg, indent_size=2))
 
     # Clear the build directory.
     if cfg.dest_dir.exists():
-        log.info(f"Clearing previous build from {make_rel(cfg.dest_dir)}")
+        log.info(f"Clearing previous build from {format_path(cfg.dest_dir)}")
         with console.status("Clearing previous build"):
             shutil.rmtree(cfg.dest_dir,
                           onexc=lambda _, name, err:
                           throw_error(f"Cannot delete {name}", err,
                                       f"Clear all files from {link(cfg.dest_dir)}"))
+    cfg.dest_dir.mkdir()
 
     # Scan the project files.
-    log.info(f"Scanning {make_rel(cfg.base_dir)}")
+    log.info(f"Scanning {format_path(cfg.base_dir)}")
     with console.status("Scanning files"):
         nodes = scan_dir(cfg.base_dir, cfg.include, cfg.exclude)
 
     # Copy the project files.
-    log.info(f"Copying {len(nodes)} nodes to {make_rel(cfg.dest_dir)}")
+    log.info(f"Copying {len(nodes)} nodes to {format_path(cfg.dest_dir)}")
     with Progress(*PROGRESS_COLUMNS, console=console, transient=True) as progress:
         for node in progress.track(nodes, description="Copying files"):
             copy_node(cfg.base_dir, cfg.dest_dir, node)
 
     # Zip the project.
-    log.info(f"Zipping installer to {make_rel(cfg.installer_path)}")
+    log.info(f"Zipping installer to {format_path(cfg.installer_path)}")
     with console.status("Zipping installer"):
         zipapp.create_archive(cfg.dest_dir, cfg.installer_path, compressed=True)
 
@@ -260,5 +255,5 @@ def main(
     log.debug(f"Finished in {runtime}")
     console.print(f"[finished]Finished in [finished.time]{runtime}[/][/]")
     console.print(f"[installer.text]Installer: [/]"
-                  f"[installer.path]{link(cfg.installer_path.parent)}/[/]"
+                  f"[installer.path]{link(cfg.installer_path.parent)}[/]"
                   f"[installer.filename]{link(cfg.installer_path, cfg.installer_path.name)}[/]")
