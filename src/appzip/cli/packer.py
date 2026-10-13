@@ -41,7 +41,7 @@ def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
         real_node = src_node.resolve()
         is_dir = real_node.is_dir()
         if src_dir not in real_node.parents:
-            log.warning(f"IGNORED external symlink {format_node()}")
+            log.warning(f"Ignored external symlink {format_node()}")
             return
         dest_node.symlink_to(real_node.relative_to(src_node.parent, walk_up=True), is_dir)
     elif src_node.is_dir():
@@ -55,6 +55,6 @@ def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
         except UnsupportedOperation:
             src_node.copy(dest_node, preserve_metadata=True)
     else:
-        log.warning(f"IGNORED unknown file type {format_node()}")
+        log.warning(f"Ignored unknown file type {format_node()}")
         return
-    log.debug(f"COPIED {format_node()}")
+    log.debug(f"Copied {format_node()}")

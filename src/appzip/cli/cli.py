@@ -27,7 +27,7 @@ from rich.progress import (
 
 from .config import load_config
 from .packer import scan_dir, copy_node
-from .utils import format_path
+from .utils import format_path, CWD
 
 START_TIME = time.perf_counter_ns()
 
@@ -59,35 +59,44 @@ PROGRESS_COLUMNS = (
     TimeRemainingColumn(compact=True, elapsed_when_finished=True),  # noqa
 )
 
-console_theme = Theme({
+theme = Theme({
     # Change bar themes to ANSI colors.
-    "bar.back": "dim bright_black",
-    "bar.complete": "bright_green",
-    "bar.finished": "green",
+    "bar.back": "dim bright_black",  # 'dim' style disabled during pulse animation.
+    "bar.complete": "bright_green",  # In-progress.
+    "bar.finished": "green",  # Progress actually finished.
     "bar.pulse": "bright_green",
     # Modify other defaults.
-    "progress.percentage": "bright_green",
-    "logging.keyword": "bold bright_cyan",
-    "logging.level.warning": "bright_yellow",
-    "logging.level.error": "bold bright_red",
-    "logging.level.critical": "reverse bold bright_red",
+    "progress.percentage": "bright_green",  # Fits better with the new ANSI bar colors.
+    "repr.path": "magenta",  # Same as default.
+    "repr.filename": "bright_magenta",  # Same as default.
+    "logging.keyword": "magenta",  # Same as 'repr.path'.
+    "logging.level.warning": "bright_yellow",  # Use bright version of color.
+    "logging.level.error": "bold bright_red",  # Use bright version of color.
+    "logging.level.critical": "reverse bold bright_red",  # Use bright version of color.
     # Custom styles.
+    # 'installer': exit message about path to installer
     "installer.text": "default",
     "installer.path": "yellow",
     "installer.filename": "bright_yellow",
+    # 'finished': exit message about elapsed time
     "finished": "dim",
     "finished.time": "cyan",
+    # 'version': version info CLI option
     "version.number": "bold cyan",
     "version.error": "bold red",
+    # 'error': exception display
     "error.msg": "red",
     "error.exc": "red bold",
     "error.suggestion": "magenta",
-    # "": "",
+    # 'help': help messages
+    "help.url": "bright_blue",
+    "help.envvar": STYLE_OPTION_ENVVAR,
+    "help.default": STYLE_OPTION_DEFAULT,
 })
 
 console = Console(
     highlight=False,
-    theme=console_theme,
+    theme=theme,
 )
 
 app = typer.Typer(
@@ -106,12 +115,12 @@ def link(path: str | Path, text: str = "") -> str:
 
 REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
 EPILOG = f"""This software is free and open source.
-[bright_blue link={REPO_LINK}]{REPO_LINK}[/]"""
+[{theme.styles['help.url']} link={REPO_LINK}]{REPO_LINK}[/]"""
 
 LOG_HELP_TEXT = (
     "Show logs in console. "
-    fr"If env var [{STYLE_OPTION_ENVVAR}]\[DEBUG][/] is set, "
-    fr"default to [{STYLE_OPTION_DEFAULT}]\[DEBUG][/]."
+    fr"If env var [{theme.styles['help.envvar']}]DEBUG[/] is set, "
+    fr"change default to [{theme.styles['help.default']}]DEBUG[/]."
 )
 
 CONFIG_FILE_NAMES = (
@@ -159,13 +168,12 @@ def find_config(path: Path) -> Path:
 def main(
         path: Annotated[Path,
         typer.Argument(
-            default_factory=Path.cwd,
             show_default=".",
             exists=True,
             resolve_path=True,
             help="Path to [green]config file[/] or directory containing [green]config file[/].",
             callback=find_config,
-        )],
+        )] = CWD,
         log_level: Annotated[LogLevel,
         typer.Option(
             "-l", "--log",
@@ -215,13 +223,18 @@ def main(
                 rich_tracebacks=True,
                 log_time_format="[%H:%M:%S.%f]",
                 show_path=False,
-                keywords=["COPIED", "IGNORED"],
+                keywords=[
+                    "->",
+                    " ./",
+                    " ~/",
+                    " ../",
+                ],
             ),
             "%(message)s"
         )
 
     # Log config details.
-    log.info(f"Config file: {format_path(path)}")
+    log.info(f"Config loaded from {format_path(path)}")
     log.debug(pretty_repr(cfg, indent_size=2))
 
     # Clear the build directory.
@@ -246,7 +259,7 @@ def main(
             copy_node(cfg.base_dir, cfg.dest_dir, node)
 
     # Zip the project.
-    log.info(f"Zipping installer to {format_path(cfg.installer_path)}")
+    log.info(f"Packing installer to {format_path(cfg.installer_path)}")
     with console.status("Zipping installer"):
         zipapp.create_archive(cfg.dest_dir, cfg.installer_path, compressed=True)
 
