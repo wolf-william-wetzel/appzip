@@ -42,7 +42,7 @@ def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
             dest_node.symlink_to(real_node.relative_to(src_node.parent, walk_up=True), real_node.is_dir())
         except UnsupportedOperation:
             SymlinkWarning.warn("Symlink creation is not available on this system.")
-            log.error(f"Cannot create symlink {node_str}")
+            log.exception(f"Cannot create symlink {node_str}")
             return
         except OSError:
             if IS_WIN:

@@ -206,7 +206,7 @@ def main(
         )] = False,
     ):
     """
-    Pack a python app into a cross-platform zip file. [bold bright_yellow]:snake:->:package:->:computer:[/]
+    Pack a python app into a cross-platform zip file. [bold bright_white]:snake:->:package:->:computer:[/]
     """
     # Load the configuration.
     with console.status("Loading configuration"):
@@ -270,7 +270,7 @@ def main(
 
     # Zip the project.
     log.info(f"Packing installer to {format_path(cfg.installer_path)}")
-    with console.status("Zipping installer"):
+    with console.status("Packing installer"):
         zipapp.create_archive(cfg.dest_dir, cfg.installer_path, compressed=True)
 
     # Print exit message.
