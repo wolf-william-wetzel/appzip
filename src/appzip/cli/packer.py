@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path, UnsupportedOperation
 
-from .utils import format_path, CWD, HOME
+from .utils import format_node, IS_WIN, SymlinkWarning
 
 
 log = logging.getLogger(__name__)
@@ -27,23 +27,29 @@ def scan_dir(folder: Path, include: tuple[str, ...], exclude: tuple[str, ...]) -
 
 def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
     dest_node = dest_dir / src_node.relative_to(src_dir)
-    real_node = None
-
-    def format_node() -> str:
-        return (f"{format_path(src_node, (src_dir,))}"
-                f"{'' if real_node is None else
-                f' -> {format_path(real_node, (src_dir, CWD, HOME))}'}")
+    node_str = format_node(src_node, src_dir)
 
     if not dest_node.parent.exists():
         dest_node.parent.mkdir(parents=True, exist_ok=True)
 
     if src_node.is_symlink():
         real_node = src_node.resolve()
-        is_dir = real_node.is_dir()
+        node_str = format_node(src_node, src_dir, real_node)
         if src_dir not in real_node.parents:
-            log.warning(f"Ignored external symlink {format_node()}")
+            log.warning(f"Ignored external symlink {node_str}")
             return
-        dest_node.symlink_to(real_node.relative_to(src_node.parent, walk_up=True), is_dir)
+        try:
+            dest_node.symlink_to(real_node.relative_to(src_node.parent, walk_up=True), real_node.is_dir())
+        except UnsupportedOperation:
+            SymlinkWarning.warn("Symlink creation is not available on this system.")
+            log.error(f"Cannot create symlink {node_str}")
+            return
+        except OSError:
+            if IS_WIN:
+                SymlinkWarning.warn("Symlink creation is not permitted. "
+                    "Run as administrator or activate Windows Developer Mode.")
+            log.error(f"Cannot create symlink {node_str}", exc_info=not IS_WIN)
+            return
     elif src_node.is_dir():
         dest_node.mkdir(exist_ok=True)
         src_mode = src_node.stat().st_mode
@@ -55,6 +61,6 @@ def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
         except UnsupportedOperation:
             src_node.copy(dest_node, preserve_metadata=True)
     else:
-        log.warning(f"Ignored unknown file type {format_node()}")
+        log.warning(f"Ignored unknown file type {node_str}")
         return
-    log.debug(f"Copied {format_node()}")
+    log.debug(f"Copied {node_str}")

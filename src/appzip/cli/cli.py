@@ -27,7 +27,7 @@ from rich.progress import (
 
 from .config import load_config
 from .packer import scan_dir, copy_node
-from .utils import format_path, CWD
+from .utils import format_path, CWD, path_abbrev
 
 START_TIME = time.perf_counter_ns()
 
@@ -88,11 +88,15 @@ theme = Theme({
     "error.msg": "red",
     "error.exc": "red bold",
     "error.suggestion": "magenta",
-    # 'help': help messages
+    # 'help' & 'config': help messages
     "help.url": "bright_blue",
     "help.envvar": STYLE_OPTION_ENVVAR,
     "help.default": STYLE_OPTION_DEFAULT,
+    "config": "dim bold green",
+    "config.name": "bright_green",
 })
+# Style for typer console when requesting nonexistent style.
+MISSING_STYLE = "bold italic blink bright_magenta"  # Make it really obvious something's wrong.
 
 console = Console(
     highlight=False,
@@ -105,6 +109,11 @@ app = typer.Typer(
 )
 
 
+def style(style_str: str):
+    """Return rich markup tag for ``style_str``, or ``MISSING_STYLE`` if invalid."""
+    return f"[{theme.styles.get(style_str) or MISSING_STYLE}]"
+
+
 def link(path: str | Path, text: str = "") -> str:
     """Return rich markup linking ``text`` to ``path``.
 
@@ -115,18 +124,23 @@ def link(path: str | Path, text: str = "") -> str:
 
 REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
 EPILOG = f"""This software is free and open source.
-[{theme.styles['help.url']} link={REPO_LINK}]{REPO_LINK}[/]"""
+{style("help.url")}{link(REPO_LINK, REPO_LINK)}[/]"""
 
-LOG_HELP_TEXT = (
-    "Show logs in console. "
-    fr"If env var [{theme.styles['help.envvar']}]DEBUG[/] is set, "
-    fr"change default to [{theme.styles['help.default']}]DEBUG[/]."
-)
+LOG_HELP_TEXT = f"""Show logs in console.
+If env var {style("help.envvar")}DEBUG[/] is set,
+change default from {style("help.default")}NONE[/] to {style("help.default")}DEBUG[/]."""
 
-CONFIG_FILE_NAMES = (
+
+CONFIG_NAMES = (
     "appzip.toml",
     "pyproject.toml",
 )
+
+CONFIG_NAMES_STR = f"{style("config")}|[/]".join(f"{style("config.name")}{name}[/]" for name in CONFIG_NAMES)
+
+PATH_HELP_TEXT = f"""The config file or a directory.
+If it's a directory, it must contain one of
+{style("config")}([/]{CONFIG_NAMES_STR}{style("config")})[/]."""
 
 ERROR_TEXT = """[error.msg]{msg}[/]
 [error.exc]{exc}[/]
@@ -157,22 +171,23 @@ def find_config(path: Path) -> Path:
     """
     if path.is_file():
         return path
-    for config in (path / name for name in CONFIG_FILE_NAMES):
+    for config in (path / name for name in CONFIG_NAMES):
         if config.exists() and os.access(config, os.R_OK):
             return config
-    names = ", ".join("'{}'".format(name) for name in CONFIG_FILE_NAMES)
+    names = ", ".join(f"'{name}'" for name in CONFIG_NAMES)
     raise typer.BadParameter(f"'{format_path(path)}' contains no readable file matching {names}.")
 
 
 @app.command(epilog=EPILOG)
 def main(
-        path: Annotated[Path,
+        config_path: Annotated[Path,
         typer.Argument(
             show_default=".",
             exists=True,
             resolve_path=True,
-            help="Path to [green]config file[/] or directory containing [green]config file[/].",
+            help=PATH_HELP_TEXT,
             callback=find_config,
+            metavar="config",
         )] = CWD,
         log_level: Annotated[LogLevel,
         typer.Option(
@@ -191,17 +206,17 @@ def main(
         )] = False,
     ):
     """
-    Pack a python app into a cross-platform zip file.
+    Pack a python app into a cross-platform zip file. [bold bright_yellow]:snake:->:package:->:computer:[/]
     """
     # Load the configuration.
     with console.status("Loading configuration"):
         try:
-            cfg = load_config(path)
+            cfg = load_config(config_path)
         except ValidationError as exc:
-            throw_error(f"{link(path)} is not a valid config file", exc,
+            throw_error(f"{link(config_path)} is not a valid config file", exc,
                         "Fix the above issue and try again.")
         except DecodeError as exc:
-            throw_error(f"{link(path)} cannot be decoded", exc,
+            throw_error(f"{link(config_path)} cannot be decoded", exc,
                         "Ensure the file is a valid TOML document.")
 
     # Set up file logging.
@@ -223,18 +238,13 @@ def main(
                 rich_tracebacks=True,
                 log_time_format="[%H:%M:%S.%f]",
                 show_path=False,
-                keywords=[
-                    "->",
-                    " ./",
-                    " ~/",
-                    " ../",
-                ],
+                keywords=[f" {abbrev}/" for abbrev in path_abbrev.values()],
             ),
             "%(message)s"
         )
 
     # Log config details.
-    log.info(f"Config loaded from {format_path(path)}")
+    log.info(f"Config loaded from {format_path(config_path)}")
     log.debug(pretty_repr(cfg, indent_size=2))
 
     # Clear the build directory.
