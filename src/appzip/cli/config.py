@@ -86,9 +86,10 @@ class ConfigFile(Base):
 
 class GenConfig:
     """Generated configuration values."""
-    log_file: Path
-    installer_path: Path
-    dest_dir: Path
+    log_file: Path  # Filename of log file inside build_dir.
+    installer_path: Path  # Filename of final installer file inside dist_dir.
+    dest_dir: Path  # Subfolder of build_dir where files are copied.
+    app_dir: Path  # Subfolder of dest_dir where app is stored.
 
 
 class Config(GenConfig):
@@ -111,6 +112,7 @@ class Config(GenConfig):
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}_{self.version}_installer.pyz"
         self.dest_dir = self.build_dir / self.installer_path.stem
+        self.app_dir = self.dest_dir / "app"
 
     def set_attr_from_config(self, name: str, *tables: Struct):
         """Set attribute ``name`` from ``tables``, searching sequentially.

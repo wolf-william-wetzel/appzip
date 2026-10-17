@@ -33,12 +33,12 @@ START_TIME = time.perf_counter_ns()
 
 
 class LogLevel(StrEnum):
-    NONE = "NONE"
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+    DEFAULT = WARNING  # The default logging level for this application.
 
 
 log = logging.getLogger()
@@ -126,9 +126,10 @@ REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
 EPILOG = f"""This software is free and open source.
 {style("help.url")}{link(REPO_LINK, REPO_LINK)}[/]"""
 
-LOG_HELP_TEXT = f"""Show logs in console.
-If env var {style("help.envvar")}DEBUG[/] is set,
-change default from {style("help.default")}NONE[/] to {style("help.default")}DEBUG[/]."""
+LOG_HELP_TEXT = f"""Filter logs by severity.
+If env var {style("help.envvar")}{LogLevel.DEBUG!s}[/] is set,
+change default from {style("help.default")}{LogLevel.DEFAULT!s}[/]
+to {style("help.default")}{LogLevel.DEBUG!s}[/]."""
 
 
 CONFIG_NAMES = (
@@ -193,10 +194,10 @@ def main(
         typer.Option(
             "-l", "--log",
             help=LOG_HELP_TEXT,
-            show_default="NONE or DEBUG",
+            show_default=f"{LogLevel.DEFAULT!s} or {LogLevel.DEBUG!s}",
             envvar=["APPZIP_LOGLEVEL", "LOGLEVEL", "LOG_LEVEL"],
             case_sensitive=False,
-        )] = LogLevel.DEBUG if os.environ.get("DEBUG") else LogLevel.NONE,
+        )] = LogLevel.DEBUG if os.environ.get("DEBUG") else LogLevel.DEFAULT,
         _: Annotated[bool,
         typer.Option(
             "-v", "--version",
@@ -206,7 +207,7 @@ def main(
         )] = False,
     ):
     """
-    Pack a python app into a cross-platform zip file. [bold bright_white]:snake:->:package:->:computer:[/]
+    Pack a python app into a cross-platform zip file. [bold white]:snake:->:package:->:computer:[/]
     """
     # Load the configuration.
     with console.status("Loading configuration"):
@@ -230,18 +231,17 @@ def main(
         "%Y-%m-%d %H:%M:%S"
     )
     # Set up console logging.
-    if log_level is not LogLevel.NONE:
-        add_handler(
-            RichHandler(
-                level=log_level.value,
-                console=console,
-                rich_tracebacks=True,
-                log_time_format="[%H:%M:%S.%f]",
-                show_path=False,
-                keywords=[f" {abbrev}/" for abbrev in path_abbrev.values()],
-            ),
-            "%(message)s"
-        )
+    add_handler(
+        RichHandler(
+            level=log_level.value,
+            console=console,
+            rich_tracebacks=True,
+            log_time_format="[%H:%M:%S.%f]",
+            show_path=False,
+            keywords=[f" {abbrev}/" for abbrev in path_abbrev.values()],
+        ),
+        "%(message)s"
+    )
 
     # Log config details.
     log.info(f"Config loaded from {format_path(config_path)}")
@@ -255,7 +255,9 @@ def main(
                           onexc=lambda _, name, err:
                           throw_error(f"Cannot delete {name}", err,
                                       f"Clear all files from {link(cfg.dest_dir)}"))
+    # Create needed directories.
     cfg.dest_dir.mkdir()
+    cfg.app_dir.mkdir()
 
     # Scan the project files.
     log.info(f"Scanning {format_path(cfg.base_dir)}")
@@ -263,10 +265,19 @@ def main(
         nodes = scan_dir(cfg.base_dir, cfg.include, cfg.exclude)
 
     # Copy the project files.
-    log.info(f"Copying {len(nodes)} nodes to {format_path(cfg.dest_dir)}")
+    log.info(f"Copying {len(nodes)} nodes to {format_path(cfg.app_dir)}")
     with Progress(*PROGRESS_COLUMNS, console=console, transient=True) as progress:
         for node in progress.track(nodes, description="Copying files"):
-            copy_node(cfg.base_dir, cfg.dest_dir, node)
+            copy_node(cfg.base_dir, cfg.app_dir, node)
+
+    # Copy the installer.
+    with console.status("Copying installer resources"):
+        appzip_dir = Path(__file__).resolve().parent.parent
+        log.info(f"Copying installer resources to {format_path(cfg.dest_dir / "installer", force_dir=True)}")
+        (appzip_dir / "installer").copy_into(cfg.dest_dir)
+        # Copy the installer entry point.
+        log.info(f"Copying entry point to {format_path(cfg.dest_dir / "__main__.py")}")
+        (appzip_dir / "installer_ep.py").copy(cfg.dest_dir / "__main__.py")
 
     # Zip the project.
     log.info(f"Packing installer to {format_path(cfg.installer_path)}")

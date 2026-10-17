@@ -42,14 +42,14 @@ DEFAULT_ABBREV = "..."
 
 
 @cache
-def format_path(path: Path, *args: Path) -> str:
+def format_path(path: Path, *args: Path, force_dir: bool = False) -> str:
     """Format ``path`` as posix, shortening it if possible.
 
     If ``path`` is a directory, append a trailing slash.
     Check for shortening in the following order: ``.``, ``..``, ``~``.
     Extra args will be searched before the defaults, with a replacement string of ``...``.
     """
-    dir_str = "/" if path.is_dir() else ""
+    dir_str = "/" if force_dir or path.is_dir() else ""
     for parent in args + tuple(path_abbrev.keys()):
         if path.is_relative_to(parent):
             return f"{path_abbrev.get(parent, DEFAULT_ABBREV)}/{path.relative_to(parent).as_posix()}{dir_str}"
