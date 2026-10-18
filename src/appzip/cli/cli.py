@@ -26,7 +26,7 @@ from rich.progress import (
 )
 
 from .config import load_config
-from .packer import scan_dir, copy_node
+from .packer import scan_dir, copy_node, add_installer_resources
 from .utils import format_path, CWD, path_abbrev
 
 START_TIME = time.perf_counter_ns()
@@ -270,14 +270,10 @@ def main(
         for node in progress.track(nodes, description="Copying files"):
             copy_node(cfg.base_dir, cfg.app_dir, node)
 
-    # Copy the installer.
-    with console.status("Copying installer resources"):
-        appzip_dir = Path(__file__).resolve().parent.parent
-        log.info(f"Copying installer resources to {format_path(cfg.dest_dir / "installer", force_dir=True)}")
-        (appzip_dir / "installer").copy_into(cfg.dest_dir)
-        # Copy the installer entry point.
-        log.info(f"Copying entry point to {format_path(cfg.dest_dir / "__main__.py")}")
-        (appzip_dir / "installer_ep.py").copy(cfg.dest_dir / "__main__.py")
+    # Copy the installer resources.
+    log.info(f"Adding installer resources to {format_path(cfg.dest_dir)}")
+    with console.status("Adding installer resources"):
+        add_installer_resources(cfg)
 
     # Zip the project.
     log.info(f"Packing installer to {format_path(cfg.installer_path)}")

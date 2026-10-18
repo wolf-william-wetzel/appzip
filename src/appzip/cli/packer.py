@@ -1,10 +1,51 @@
 import logging
 from pathlib import Path, UnsupportedOperation
 
-from .utils import format_node, IS_WIN, SymlinkWarning
+import msgspec
+
+from .utils import format_path, format_node, IS_WIN, SymlinkWarning
+from .config import Config
 
 
 log = logging.getLogger(__name__)
+
+PARENT_PACKAGE = Path(__file__).resolve().parent.parent
+INSTALLER_LIB = PARENT_PACKAGE / "installer"
+INSTALLER_ENTRY_POINT = PARENT_PACKAGE / "installer_ep.py"
+
+
+class Metadata(msgspec.Struct):
+    """Metadata for the installer."""
+    name: str
+    version: str
+    description: str = ""
+    minimum_python: int = 0
+    dependencies: list[str] = []
+
+    @classmethod
+    def from_config(cls, cfg: Config):
+        """Initialize metadata from a ``Config`` object."""
+        min_python = 0
+        return cls(cfg.name, cfg.version, cfg.description or "", min_python, cfg.dependencies)
+
+    @classmethod
+    def write_config_to_file(cls, cfg: Config):
+        """Write metadata initialized from ``cfg`` to ``cfg.metadata_file``."""
+        with open(cfg.metadata_file, "wb") as f:
+            f.write(msgspec.json.encode(cls.from_config(cfg)))
+
+
+def add_installer_resources(cfg: Config):
+    """Add the installer resources to the current build."""
+    # Copy the installer lib.
+    log.debug(f"Copying installer lib to {format_path(cfg.dest_dir / INSTALLER_LIB.name, force_dir=True)}")
+    INSTALLER_LIB.copy_into(cfg.dest_dir)
+    # Copy the installer entry point.
+    log.debug(f"Copying installer entry point to {format_path(cfg.entry_point)}")
+    INSTALLER_ENTRY_POINT.copy(cfg.entry_point)
+    # Write metadata.
+    log.debug(f"Writing installer metadata to {format_path(cfg.metadata_file)}")
+    Metadata.write_config_to_file(cfg)
 
 
 def parents_ok(node: Path, excluded: set[Path]) -> bool:

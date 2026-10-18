@@ -90,6 +90,8 @@ class GenConfig:
     installer_path: Path  # Filename of final installer file inside dist_dir.
     dest_dir: Path  # Subfolder of build_dir where files are copied.
     app_dir: Path  # Subfolder of dest_dir where app is stored.
+    metadata_file: Path  # Filename of metadata file inside dest_dir.
+    entry_point: Path  # Filename of installer entry point inside dest_dir.
 
 
 class Config(GenConfig):
@@ -113,6 +115,8 @@ class Config(GenConfig):
         self.installer_path = self.dist_dir / f"{self.name}_{self.version}_installer.pyz"
         self.dest_dir = self.build_dir / self.installer_path.stem
         self.app_dir = self.dest_dir / "app"
+        self.metadata_file = self.dest_dir / "metadata.json"
+        self.entry_point = self.dest_dir / "__main__.py"
 
     def set_attr_from_config(self, name: str, *tables: Struct):
         """Set attribute ``name`` from ``tables``, searching sequentially.
