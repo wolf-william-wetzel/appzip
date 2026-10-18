@@ -18,15 +18,20 @@ class Metadata(msgspec.Struct):
     """Metadata for the installer."""
     name: str
     version: str
-    description: str = ""
-    minimum_python: int = 0
-    dependencies: list[str] = []
+    description: str
+    minimum_python: int
+    dependencies: list[str]
 
     @classmethod
     def from_config(cls, cfg: Config):
         """Initialize metadata from a ``Config`` object."""
-        min_python = 0
-        return cls(cfg.name, cfg.version, cfg.description or "", min_python, cfg.dependencies)
+        return cls(
+            cfg.name,
+            cfg.version,
+            cfg.description or "",
+            cfg.minimum_python,
+            cfg.dependencies,
+        )
 
     @classmethod
     def write_config_to_file(cls, cfg: Config):
