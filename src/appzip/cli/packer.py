@@ -2,6 +2,7 @@ import logging
 from pathlib import Path, UnsupportedOperation
 
 import msgspec
+from packaging.requirements import Requirement
 
 from .utils import format_path, format_node, IS_WIN, SymlinkWarning
 from .config import Config
@@ -14,13 +15,21 @@ INSTALLER_LIB = PARENT_PACKAGE / "installer"
 INSTALLER_ENTRY_POINT = PARENT_PACKAGE / "installer_ep.py"
 
 
+def enc_hook(obj):
+    type_ = type(obj)
+    if type_ is Requirement:
+        return str(obj)
+    module = "" if type_.__module__ in (None, "builtins") else f"{type_.__module__}."
+    raise NotImplementedError(f"unsupported type '{module}{type_.__qualname__}'")
+
+
 class Metadata(msgspec.Struct):
     """Metadata for the installer."""
     name: str
     version: str
     description: str
     minimum_python: int
-    dependencies: list[str]
+    dependencies: list[Requirement]
 
     @classmethod
     def from_config(cls, cfg: Config):
@@ -37,7 +46,7 @@ class Metadata(msgspec.Struct):
     def write_config_to_file(cls, cfg: Config):
         """Write metadata initialized from ``cfg`` to ``cfg.metadata_file``."""
         with open(cfg.metadata_file, "wb") as f:
-            f.write(msgspec.json.encode(cls.from_config(cfg)))
+            f.write(msgspec.json.encode(cls.from_config(cfg), enc_hook=enc_hook))
 
 
 def add_installer_resources(cfg: Config):

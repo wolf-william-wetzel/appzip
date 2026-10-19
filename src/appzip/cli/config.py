@@ -4,6 +4,7 @@ from platform import python_version
 
 from msgspec import Struct, field, toml, ValidationError
 from packaging.specifiers import SpecifierSet
+from packaging.requirements import Requirement
 
 
 def validate_dir(obj: str, create: bool = False) -> Path:
@@ -48,8 +49,8 @@ class DirPath(Path):
 
 
 def dec_hook(type_: type, obj):
-    if type_ is SpecifierSet:
-        return SpecifierSet(obj)
+    if type_ in (Requirement, SpecifierSet):
+        return type_(obj)
     if hasattr(type_, "validate") and callable(type_.validate):
         return type_.validate(obj)
     module = "" if type_.__module__ in (None, "builtins") else f"{type_.__module__}."
@@ -66,7 +67,7 @@ class Project(Base):
     version: str | None = None
     description: str | None = None
     requires_python: SpecifierSet = SpecifierSet(f">={python_version()}")
-    dependencies: list[str] = []
+    dependencies: list[Requirement] = []
 
 
 class Appzip(Base):
@@ -104,7 +105,7 @@ class Config(GenConfig):
     version: str
     description: str | None
     requires_python: SpecifierSet
-    dependencies: list[str]
+    dependencies: list[Requirement]
     base_dir: Path
     build_dir: Path
     dist_dir: Path
@@ -122,11 +123,7 @@ class Config(GenConfig):
         self.app_dir = self.dest_dir / "app"
         self.metadata_file = self.dest_dir / "metadata.json"
         self.entry_point = self.dest_dir / "__main__.py"
-        minor = next(self.requires_python.filter(
-            range(14, 255),
-            key=lambda i: "3.{0}".format(i)
-        ), None)
-        if minor is None:
+        if not (minor := next(self.requires_python.filter(range(14, 255), key=lambda i: f"3.{i}"), 0)):
             raise ValidationError(f"Minimum python version couldn't be determined from '{self.requires_python!s}'")
         self.minimum_python = int(f"3{minor:0>2x}00f0", 16)
 
