@@ -12,8 +12,14 @@ appzip = [
     "tomli-w",
 ]
 
-[project.scripts]
-testapp = "testproject:main"
+[project.entry-points."appzip.scripts"]
+testapp = "app:main"
+
+[project.entry-points."appzip.scripts.console"]
+testapp_console = "app:main"
+
+[project.entry-points."appzip.scripts.gui"]
+testapp_gui = "app:main"
 
 [tool.appzip]
 exclude = ["build", "dist", "exclude.txt", "hidden"]

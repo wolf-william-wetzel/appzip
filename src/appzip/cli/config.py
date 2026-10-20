@@ -1,6 +1,7 @@
 from pathlib import Path
 from annotationlib import get_annotations
 from platform import python_version
+from importlib.metadata import EntryPoint, EntryPoints  # noqa
 
 from msgspec import Struct, field, toml, ValidationError
 from packaging.specifiers import SpecifierSet
@@ -50,6 +51,14 @@ class DirPath(Path):
 
 
 def dec_hook(type_: type, obj):
+    if type_ is EntryPoints:
+        eps = []
+        for group, ep in obj.items():
+            if not group.startswith("appzip."):
+                continue
+            for name, value in ep.items():
+                eps.append(EntryPoint(name, value, group))
+        return EntryPoints(eps)
     if type_ in (Requirement, SpecifierSet, DependencyGroupResolver):
         return type_(obj)
     if hasattr(type_, "validate") and callable(type_.validate):
@@ -69,6 +78,7 @@ class Project(Base):
     description: str = ""
     requires_python: SpecifierSet = SpecifierSet(f">={python_version()}")
     dependencies: list[Requirement] = []
+    entry_points: EntryPoints = EntryPoints()
 
 
 class Appzip(Base):
@@ -108,6 +118,7 @@ class Config(GenConfig):
     description: str
     requires_python: SpecifierSet
     dependencies: list[Requirement]
+    entry_points : EntryPoints
     base_dir: Path
     build_dir: Path
     dist_dir: Path

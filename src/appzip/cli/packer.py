@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path, UnsupportedOperation
 from annotationlib import get_annotations
+from importlib.metadata import EntryPoint, EntryPoints  # noqa
+import json
 
 import msgspec
 from packaging.requirements import Requirement
@@ -21,6 +23,10 @@ def enc_hook(obj):
     type_ = type(obj)
     if type_ is Requirement:
         return str(obj)
+    if type_ is EntryPoint:
+        return {"name": obj.name, "value": obj.value, "group": obj.group}
+    if type_ is Metadata:
+        return obj.to_dict()
     module = "" if type_.__module__ in (None, "builtins") else f"{type_.__module__}."
     raise NotImplementedError(f"unsupported type '{module}{type_.__qualname__}'")
 
@@ -32,6 +38,10 @@ class Metadata(msgspec.Struct):
     description: str
     minimum_python: int
     dependencies: list[Requirement]
+    entry_points: EntryPoints
+
+    def to_dict(self):
+        return {f: getattr(self, f) for f in self.__struct_fields__}
 
     @classmethod
     def from_config(cls, cfg: Config):
@@ -42,16 +52,17 @@ class Metadata(msgspec.Struct):
 def add_installer_resources(cfg: Config):
     """Add the installer resources to the current build."""
     # Copy the installer lib.
-    log.debug(f"Copying installer lib to {format_path(cfg.dest_dir / INSTALLER_LIB.name, force_dir=True)}")
+    log.info(f"Copying installer lib to {format_path(cfg.dest_dir / INSTALLER_LIB.name, force_dir=True)}")
     INSTALLER_LIB.copy_into(cfg.dest_dir)
     # Copy the installer entry point.
-    log.debug(f"Copying installer entry point to {format_path(cfg.entry_point)}")
+    log.info(f"Copying installer entry point to {format_path(cfg.entry_point)}")
     INSTALLER_ENTRY_POINT.copy(cfg.entry_point)
     # Write metadata.
-    log.debug(f"Writing installer metadata to {format_path(cfg.metadata_file)}")
+    log.info(f"Writing installer metadata to {format_path(cfg.metadata_file)}")
     with open(cfg.metadata_file, "wb") as f:
         metadata = Metadata.from_config(cfg)
         log.debug(pretty_repr(metadata, indent_size=2))
+        log.debug(json.dumps(metadata, indent=2, default=enc_hook))
         f.write(msgspec.json.encode(metadata, enc_hook=enc_hook))
 
 
