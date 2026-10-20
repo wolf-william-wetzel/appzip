@@ -1,8 +1,10 @@
 import logging
 from pathlib import Path, UnsupportedOperation
+from annotationlib import get_annotations
 
 import msgspec
 from packaging.requirements import Requirement
+from rich.pretty import pretty_repr
 
 from .utils import format_path, format_node, IS_WIN, SymlinkWarning
 from .config import Config
@@ -34,19 +36,7 @@ class Metadata(msgspec.Struct):
     @classmethod
     def from_config(cls, cfg: Config):
         """Initialize metadata from a ``Config`` object."""
-        return cls(
-            cfg.name,
-            cfg.version,
-            cfg.description or "",
-            cfg.minimum_python,
-            cfg.dependencies,
-        )
-
-    @classmethod
-    def write_config_to_file(cls, cfg: Config):
-        """Write metadata initialized from ``cfg`` to ``cfg.metadata_file``."""
-        with open(cfg.metadata_file, "wb") as f:
-            f.write(msgspec.json.encode(cls.from_config(cfg), enc_hook=enc_hook))
+        return cls(**{k: getattr(cfg, k) for k in get_annotations(cls) if hasattr(cfg, k)})
 
 
 def add_installer_resources(cfg: Config):
@@ -59,7 +49,10 @@ def add_installer_resources(cfg: Config):
     INSTALLER_ENTRY_POINT.copy(cfg.entry_point)
     # Write metadata.
     log.debug(f"Writing installer metadata to {format_path(cfg.metadata_file)}")
-    Metadata.write_config_to_file(cfg)
+    with open(cfg.metadata_file, "wb") as f:
+        metadata = Metadata.from_config(cfg)
+        log.debug(pretty_repr(metadata, indent_size=2))
+        f.write(msgspec.json.encode(metadata, enc_hook=enc_hook))
 
 
 def parents_ok(node: Path, excluded: set[Path]) -> bool:

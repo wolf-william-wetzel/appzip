@@ -7,6 +7,11 @@ dependencies = [
     "requests>=2.34.2",
 ]
 
+[dependency-groups]
+appzip = [
+    "tomli-w",
+]
+
 [project.scripts]
 testapp = "testproject:main"
 

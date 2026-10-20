@@ -5,6 +5,7 @@ from platform import python_version
 from msgspec import Struct, field, toml, ValidationError
 from packaging.specifiers import SpecifierSet
 from packaging.requirements import Requirement
+from packaging.dependency_groups import DependencyGroupResolver
 
 
 def validate_dir(obj: str, create: bool = False) -> Path:
@@ -49,7 +50,7 @@ class DirPath(Path):
 
 
 def dec_hook(type_: type, obj):
-    if type_ in (Requirement, SpecifierSet):
+    if type_ in (Requirement, SpecifierSet, DependencyGroupResolver):
         return type_(obj)
     if hasattr(type_, "validate") and callable(type_.validate):
         return type_.validate(obj)
@@ -65,7 +66,7 @@ class Base(Struct, frozen=True, rename="kebab"):
 class Project(Base):
     name: str
     version: str | None = None
-    description: str | None = None
+    description: str = ""
     requires_python: SpecifierSet = SpecifierSet(f">={python_version()}")
     dependencies: list[Requirement] = []
 
@@ -86,6 +87,7 @@ class Tool(Base):
 class ConfigFile(Base):
     """Represents the entire configuration file."""
     project: Project
+    dependency_groups: DependencyGroupResolver = DependencyGroupResolver({})
     tool: Tool = field(default_factory=Tool)
 
 
@@ -103,7 +105,7 @@ class GenConfig:
 class Config(GenConfig):
     name: str
     version: str
-    description: str | None
+    description: str
     requires_python: SpecifierSet
     dependencies: list[Requirement]
     base_dir: Path
@@ -116,6 +118,11 @@ class Config(GenConfig):
         # Load values from config file.
         for name in get_annotations(self.__class__):
             self.set_attr_from_config(name, config.tool.appzip, config.project)
+        # Add appzip dependencies.
+        try:
+            self.dependencies.extend(config.dependency_groups.resolve("appzip"))
+        except* LookupError:
+            pass
         # Calculate generated values.
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}_{self.version}_installer.pyz"
