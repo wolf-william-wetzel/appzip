@@ -12,6 +12,12 @@ appzip = [
     "tomli-w",
 ]
 
+[project.scripts]
+default = "app:main"
+
+[project.gui-scripts]
+default_gui = "app:main"
+
 [project.entry-points."appzip.scripts"]
 testapp = "app:main"
 

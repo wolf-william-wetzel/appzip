@@ -1,15 +1,13 @@
 import logging
 from pathlib import Path, UnsupportedOperation
 from annotationlib import get_annotations
-from importlib.metadata import EntryPoint, EntryPoints  # noqa
 import json
 
 import msgspec
 from packaging.requirements import Requirement
-from rich.pretty import pretty_repr
 
-from .utils import format_path, format_node, IS_WIN, SymlinkWarning
-from .config import Config
+from .utils import format_path, format_node, IS_WIN, SymlinkWarning, prepr, INDENT_SIZE
+from .config import Config, EntryPoints, EntryPoint
 
 
 log = logging.getLogger(__name__)
@@ -24,9 +22,7 @@ def enc_hook(obj):
     if type_ is Requirement:
         return str(obj)
     if type_ is EntryPoint:
-        return {"name": obj.name, "value": obj.value, "group": obj.group}
-    if type_ is Metadata:
-        return obj.to_dict()
+        return [obj.name, obj.value, obj.group]
     module = "" if type_.__module__ in (None, "builtins") else f"{type_.__module__}."
     raise NotImplementedError(f"unsupported type '{module}{type_.__qualname__}'")
 
@@ -61,8 +57,8 @@ def add_installer_resources(cfg: Config):
     log.info(f"Writing installer metadata to {format_path(cfg.metadata_file)}")
     with open(cfg.metadata_file, "wb") as f:
         metadata = Metadata.from_config(cfg)
-        log.debug(pretty_repr(metadata, indent_size=2))
-        log.debug(json.dumps(metadata, indent=2, default=enc_hook))
+        log.debug(prepr(metadata))
+        log.debug(json.dumps(metadata.to_dict(), indent=INDENT_SIZE, default=enc_hook))
         f.write(msgspec.json.encode(metadata, enc_hook=enc_hook))
 
 

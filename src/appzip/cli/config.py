@@ -1,12 +1,37 @@
 from pathlib import Path
 from annotationlib import get_annotations
 from platform import python_version
-from importlib.metadata import EntryPoint, EntryPoints  # noqa
+from dataclasses import dataclass, replace
 
 from msgspec import Struct, field, toml, ValidationError
 from packaging.specifiers import SpecifierSet
 from packaging.requirements import Requirement
 from packaging.dependency_groups import DependencyGroupResolver
+
+
+@dataclass
+class EntryPoint:
+    name: str
+    value: str
+    group: str
+
+    def with_group(self, group: str):
+        """Return an identical ``EntryPoint`` but with ``group``."""
+        return replace(self, group=group)
+
+
+class EntryPoints(list):
+    @classmethod
+    def validate(cls, obj: dict[str, str] | dict[str, dict[str, str]]):
+        eps: list[EntryPoint] = cls()
+        for group, ep in obj.items():
+            # Project scripts or gui scripts.
+            if type(ep) is str:
+                eps.append(EntryPoint(group, ep, ""))
+            # Entry points table.
+            if type(ep) is dict and group.startswith("appzip."):
+                eps.extend(EntryPoint(n, v, group) for n, v in ep.items())  # noqa
+        return eps
 
 
 def validate_dir(obj: str, create: bool = False) -> Path:
@@ -51,14 +76,6 @@ class DirPath(Path):
 
 
 def dec_hook(type_: type, obj):
-    if type_ is EntryPoints:
-        eps = []
-        for group, ep in obj.items():
-            if not group.startswith("appzip."):
-                continue
-            for name, value in ep.items():
-                eps.append(EntryPoint(name, value, group))
-        return EntryPoints(eps)
     if type_ in (Requirement, SpecifierSet, DependencyGroupResolver):
         return type_(obj)
     if hasattr(type_, "validate") and callable(type_.validate):
@@ -78,6 +95,8 @@ class Project(Base):
     description: str = ""
     requires_python: SpecifierSet = SpecifierSet(f">={python_version()}")
     dependencies: list[Requirement] = []
+    scripts: EntryPoints = EntryPoints()
+    gui_scripts: EntryPoints = EntryPoints()
     entry_points: EntryPoints = EntryPoints()
 
 
@@ -98,7 +117,7 @@ class ConfigFile(Base):
     """Represents the entire configuration file."""
     project: Project
     dependency_groups: DependencyGroupResolver = DependencyGroupResolver({})
-    tool: Tool = field(default_factory=Tool)
+    tool: Tool = field(default_factory=Tool)  # Tool and all subtables need lazily loaded defaults.
 
 
 class GenConfig:
@@ -110,6 +129,7 @@ class GenConfig:
     metadata_file: Path  # Filename of metadata file inside dest_dir.
     entry_point: Path  # Filename of installer entry point inside dest_dir.
     minimum_python: int  # Minimum python hex version for the app.
+    extra_deps: tuple[Requirement, ...]  # Extra dependencies loaded from dependency groups.
 
 
 class Config(GenConfig):
@@ -118,7 +138,9 @@ class Config(GenConfig):
     description: str
     requires_python: SpecifierSet
     dependencies: list[Requirement]
-    entry_points : EntryPoints
+    scripts: EntryPoints
+    gui_scripts: EntryPoints
+    entry_points: EntryPoints
     base_dir: Path
     build_dir: Path
     dist_dir: Path
@@ -131,9 +153,16 @@ class Config(GenConfig):
             self.set_attr_from_config(name, config.tool.appzip, config.project)
         # Add appzip dependencies.
         try:
-            self.dependencies.extend(config.dependency_groups.resolve("appzip"))
+            self.extra_deps = config.dependency_groups.resolve("appzip")
+            self.dependencies.extend(self.extra_deps)
         except* LookupError:
-            pass
+            self.extra_deps = ()
+        # Load project entry points if no appzip entry points are found.
+        if not self.entry_points:
+            if not self.scripts and not self.gui_scripts:
+                raise ValidationError("No entry points found in config file.")
+            self.entry_points.extend(ep.with_group("console-scripts") for ep in self.scripts)
+            self.entry_points.extend(ep.with_group("gui-scripts") for ep in self.gui_scripts)
         # Calculate generated values.
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}_{self.version}_installer.pyz"

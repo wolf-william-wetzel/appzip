@@ -14,7 +14,6 @@ from typer.rich_utils import STYLE_OPTION_ENVVAR, STYLE_OPTION_DEFAULT
 from msgspec import ValidationError, DecodeError
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.pretty import pretty_repr
 from rich.theme import Theme
 from rich.progress import (
     Progress,
@@ -27,7 +26,7 @@ from rich.progress import (
 
 from .config import load_config
 from .packer import scan_dir, copy_node, add_installer_resources
-from .utils import format_path, CWD, path_abbrev
+from .utils import format_path, CWD, path_abbrev, prepr
 
 START_TIME = time.perf_counter_ns()
 
@@ -207,7 +206,7 @@ def main(
         )] = False,
     ):
     """
-    Pack a python app into a cross-platform zip file. [bold white]:snake:->:package:->:computer:[/]
+    Pack a python app into a cross-platform zip file. [bold]:snake:->:package:->:computer:[/]
     """
     # Load the configuration.
     with console.status("Loading configuration"):
@@ -245,7 +244,7 @@ def main(
 
     # Log config details.
     log.info(f"Config loaded from {format_path(config_path)}")
-    log.debug(pretty_repr(cfg, indent_size=2))
+    log.debug(prepr(cfg))
 
     # Clear the build directory.
     if cfg.dest_dir.exists():
