@@ -167,7 +167,7 @@ class Config(GenConfig):
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}_{self.version}_installer.pyz"
         self.dest_dir = self.build_dir / self.installer_path.stem
-        self.app_dir = self.dest_dir / "app"
+        self.app_dir = self.dest_dir / "app" / self.base_dir.name
         self.metadata_file = self.dest_dir / "metadata.json"
         self.entry_point = self.dest_dir / "__main__.py"
         if not (minor := next(self.requires_python.filter(range(14, 255), key=lambda i: f"3.{i}"), 0)):

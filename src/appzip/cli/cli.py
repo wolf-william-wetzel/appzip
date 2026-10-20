@@ -4,7 +4,6 @@ from importlib.metadata import version, PackageNotFoundError
 import logging
 from enum import StrEnum
 import os
-import shutil
 import time
 import datetime as dt
 import zipapp
@@ -25,7 +24,7 @@ from rich.progress import (
 )
 
 from .config import load_config
-from .packer import scan_dir, copy_node, add_installer_resources
+from .packer import scan_dir, copy_node, add_installer_resources, clear_previous_build
 from .utils import format_path, CWD, path_abbrev, prepr
 
 START_TIME = time.perf_counter_ns()
@@ -247,16 +246,13 @@ def main(
     log.debug(prepr(cfg))
 
     # Clear the build directory.
-    if cfg.dest_dir.exists():
-        log.info(f"Clearing previous build from {format_path(cfg.dest_dir)}")
-        with console.status("Clearing previous build"):
-            shutil.rmtree(cfg.dest_dir,
-                          onexc=lambda _, name, err:
-                          throw_error(f"Cannot delete {name}", err,
-                                      f"Clear all files from {link(cfg.dest_dir)}"))
-    # Create needed directories.
-    cfg.dest_dir.mkdir()
-    cfg.app_dir.mkdir()
+    with console.status("Clearing previous build"):
+        if failures := clear_previous_build(cfg.dest_dir):
+            throw_error(
+                f"Cannot delete '{"', '".join(failures)}'.",
+                OSError("Something went wrong."),
+                f"Clear all files from {link(cfg.dest_dir)}",
+            )
 
     # Scan the project files.
     log.info(f"Scanning {format_path(cfg.base_dir)}")

@@ -1,13 +1,14 @@
 import logging
 from pathlib import Path, UnsupportedOperation
 from annotationlib import get_annotations
-import json
+import shutil
 
 import msgspec
 from packaging.requirements import Requirement
+from rich.highlighter import JSONHighlighter
 
-from .utils import format_path, format_node, IS_WIN, SymlinkWarning, prepr, INDENT_SIZE
-from .config import Config, EntryPoints, EntryPoint
+from .utils import format_path, format_node, IS_WIN, SymlinkWarning, prepr
+from .config import Config, EntryPoints
 
 
 log = logging.getLogger(__name__)
@@ -21,8 +22,6 @@ def enc_hook(obj):
     type_ = type(obj)
     if type_ is Requirement:
         return str(obj)
-    if type_ is EntryPoint:
-        return [obj.name, obj.value, obj.group]
     module = "" if type_.__module__ in (None, "builtins") else f"{type_.__module__}."
     raise NotImplementedError(f"unsupported type '{module}{type_.__qualname__}'")
 
@@ -58,8 +57,18 @@ def add_installer_resources(cfg: Config):
     with open(cfg.metadata_file, "wb") as f:
         metadata = Metadata.from_config(cfg)
         log.debug(prepr(metadata))
-        log.debug(json.dumps(metadata.to_dict(), indent=INDENT_SIZE, default=enc_hook))
-        f.write(msgspec.json.encode(metadata, enc_hook=enc_hook))
+        data = msgspec.json.encode(metadata, enc_hook=enc_hook)
+        log.debug(data, extra={"highlighter": JSONHighlighter()})  # noqa
+        f.write(data)
+
+
+def clear_previous_build(path: Path) -> list[str]:
+    """Clear ``path`` with ``shutil.rmtree``. Return list of failed removals."""
+    failures = []
+    if path.exists():
+        log.info(f"Clearing previous build from {format_path(path)}")
+        shutil.rmtree(path, onexc=lambda _, name, _e: failures.append(name))
+    return failures
 
 
 def parents_ok(node: Path, excluded: set[Path]) -> bool:
