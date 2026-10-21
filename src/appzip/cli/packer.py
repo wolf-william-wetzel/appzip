@@ -7,7 +7,7 @@ import msgspec
 from packaging.requirements import Requirement
 from rich.highlighter import JSONHighlighter
 
-from .utils import format_path, format_node, IS_WIN, SymlinkWarning, prepr
+from .utils import format_path, format_node, IS_WIN, SymlinkWarning, prepr, RmtreeError
 from .config import Config, EntryPoints
 
 
@@ -35,9 +35,6 @@ class Metadata(msgspec.Struct):
     dependencies: list[Requirement]
     entry_points: EntryPoints
 
-    def to_dict(self):
-        return {f: getattr(self, f) for f in self.__struct_fields__}
-
     @classmethod
     def from_config(cls, cfg: Config):
         """Initialize metadata from a ``Config`` object."""
@@ -47,7 +44,7 @@ class Metadata(msgspec.Struct):
 def add_installer_resources(cfg: Config):
     """Add the installer resources to the current build."""
     # Copy the installer lib.
-    log.info(f"Copying installer lib to {format_path(cfg.dest_dir / INSTALLER_LIB.name, force_dir=True)}")
+    log.info(f"Copying installer lib to {format_path(cfg.dest_dir / INSTALLER_LIB.name)}/")
     INSTALLER_LIB.copy_into(cfg.dest_dir)
     # Copy the installer entry point.
     log.info(f"Copying installer entry point to {format_path(cfg.entry_point)}")
@@ -62,13 +59,14 @@ def add_installer_resources(cfg: Config):
         f.write(data)
 
 
-def clear_previous_build(path: Path) -> list[str]:
-    """Clear ``path`` with ``shutil.rmtree``. Return list of failed removals."""
-    failures = []
+def clear_previous_build(path: Path):
+    """Clear ``path`` with ``shutil.rmtree``. Raise ``RmtreeError`` if any errors occurred."""
+    failures: list[tuple[str, BaseException]] = []
     if path.exists():
         log.info(f"Clearing previous build from {format_path(path)}")
-        shutil.rmtree(path, onexc=lambda _, name, _e: failures.append(name))
-    return failures
+        shutil.rmtree(path, onexc=lambda _, n, e: failures.append((n, e)))
+    if failures:
+        raise RmtreeError(path, failures)
 
 
 def parents_ok(node: Path, excluded: set[Path]) -> bool:

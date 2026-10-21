@@ -14,6 +14,15 @@ INDENT_SIZE = 2
 prepr = partial(pretty_repr, indent_size=INDENT_SIZE, expand_all=True)
 
 
+class AppzipError(Exception):
+    pass
+
+
+class RmtreeError(AppzipError):
+    def __init__(self, base: Path, failures: list[tuple[str, BaseException]]):
+        super().__init__("\n".join(f"{format_path(Path(n), base)} -> {e}" for n, e in failures))
+
+
 class AppzipWarning(Warning):
     level: int = logging.WARNING
 
