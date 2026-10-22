@@ -1,13 +1,5 @@
 from pathlib import Path
-from functools import cache, partial
-import sys
-
-from rich.pretty import pretty_repr
-
-IS_WIN = sys.platform == "win32"
-INDENT_SIZE = 2
-prepr = partial(pretty_repr, indent_size=INDENT_SIZE, expand_all=True)
-
+from functools import cache
 
 HOME = Path.home()
 CWD = Path.cwd()  # Shouldn't change throughout program run.

@@ -6,10 +6,13 @@ import time
 import zipapp
 import datetime as dt
 import os
+import sys
+from functools import partial
 
 import msgspec
 from packaging.requirements import Requirement
 from rich.highlighter import JSONHighlighter
+from rich.pretty import pretty_repr
 from rich.console import Console
 from rich.progress import Progress
 from rich.progress import (
@@ -20,20 +23,16 @@ from rich.progress import (
     TaskProgressColumn,
 )
 
-from .utils import (
-    format_path,
-    format_node,
-    link,
-    IS_WIN,
-    prepr,
-    CWD,
-)
+from .utils import format_path, format_node, link, CWD
 from .config import Config, EntryPoints, load_config
 from .errors import *
 
 START_TIME = time.perf_counter_ns()
+IS_WIN = sys.platform == "win32"
 
 log = logging.getLogger(__name__)
+
+prepr = partial(pretty_repr, indent_size=2, expand_all=True)
 
 PARENT_PACKAGE = Path(__file__).resolve().parent.parent
 INSTALLER_LIB = PARENT_PACKAGE / "installer"
