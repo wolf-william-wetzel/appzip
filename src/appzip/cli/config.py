@@ -8,6 +8,8 @@ from packaging.specifiers import SpecifierSet
 from packaging.requirements import Requirement
 from packaging.dependency_groups import DependencyGroupResolver
 
+from .utils import link
+
 
 @dataclass
 class EntryPoint:
@@ -159,10 +161,17 @@ class Config(GenConfig):
             self.extra_deps = ()
         # Load project entry points if no appzip entry points are found.
         if not self.entry_points:
-            if not self.scripts and not self.gui_scripts:
-                raise ValidationError("No entry points found in config file.")
-            self.entry_points.extend(ep.with_group("console-scripts") for ep in self.scripts)
-            self.entry_points.extend(ep.with_group("gui-scripts") for ep in self.gui_scripts)
+            # Load entry points from project table.
+            if self.scripts or self.gui_scripts:
+                self.entry_points.extend(ep.with_group("console-scripts") for ep in self.scripts)
+                self.entry_points.extend(ep.with_group("gui-scripts") for ep in self.gui_scripts)
+            # Use __main__.py as an entry point.
+            elif (self.base_dir / "__main__.py").exists():
+                self.entry_points.append(EntryPoint(self.name, self.base_dir.name, "appzip.scripts"))
+            # No entry points found.
+            else:
+                raise ValidationError(f"{link(self.base_dir)} has no __main__.py and "
+                                      f"no entry points were found in the config file.")
         # Calculate generated values.
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}_{self.version}_installer.pyz"

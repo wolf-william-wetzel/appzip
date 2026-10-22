@@ -25,7 +25,7 @@ from rich.progress import (
 
 from .config import load_config
 from .packer import scan_dir, copy_node, add_installer_resources, clear_previous_build
-from .utils import format_path, CWD, path_abbrev, prepr, RmtreeError
+from .utils import format_path, link, CWD, path_abbrev, prepr, RmtreeError
 
 START_TIME = time.perf_counter_ns()
 
@@ -112,20 +112,13 @@ def style(style_str: str):
     return f"[{theme.styles.get(style_str) or MISSING_STYLE}]"
 
 
-def link(path: str | Path, text: str = "") -> str:
-    """Return rich markup linking ``text`` to ``path``.
-
-    If ``text`` is the empty string, it becomes formatted ``path``.
-    """
-    return f"[link={path}]{text if text else format_path(Path(path))}[/]"
-
-
 REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
 EPILOG = f"""This software is free and open source.
 {style("help.url")}{link(REPO_LINK, REPO_LINK)}[/]"""
 
+DEBUG_ENV_VAR = "DEBUG"
 LOG_HELP_TEXT = f"""Filter logs by severity.
-If env var {style("help.envvar")}{LogLevel.DEBUG!s}[/] is set,
+If env var {style("help.envvar")}{DEBUG_ENV_VAR}[/] is set,
 change default from {style("help.default")}{LogLevel.DEFAULT!s}[/]
 to {style("help.default")}{LogLevel.DEBUG!s}[/]."""
 
@@ -195,7 +188,7 @@ def main(
             show_default=f"{LogLevel.DEFAULT!s} or {LogLevel.DEBUG!s}",
             envvar=["APPZIP_LOGLEVEL", "LOGLEVEL", "LOG_LEVEL"],
             case_sensitive=False,
-        )] = LogLevel.DEBUG if os.environ.get("DEBUG") else LogLevel.DEFAULT,
+        )] = LogLevel.DEBUG if os.environ.get(DEBUG_ENV_VAR) else LogLevel.DEFAULT,
         _: Annotated[bool,
         typer.Option(
             "-v", "--version",
@@ -272,7 +265,7 @@ def main(
     # Zip the project.
     log.info(f"Packing installer to {format_path(cfg.installer_path)}")
     with console.status("Packing installer"):
-        zipapp.create_archive(cfg.dest_dir, cfg.installer_path, compressed=True)
+        zipapp.create_archive(cfg.dest_dir, cfg.installer_path)
 
     # Print exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)

@@ -73,3 +73,11 @@ def format_path(path: Path, *args: Path, force_dir: bool = False) -> str:
 def format_node(node: Path, base: Path, real: Path | None = None) -> str:
     """Format ``node`` with an optional real path for symlinks. Both will be checked against ``base``."""
     return f"{format_path(node, base)}{f' -> {format_path(real, base)}' if real else ''}"
+
+
+def link(path: str | Path, text: str = "") -> str:
+    """Return rich markup linking ``text`` to ``path``.
+
+    If ``text`` is the empty string, it becomes formatted ``path``.
+    """
+    return f"[link={path}]{text if text else format_path(Path(path))}[/]"
