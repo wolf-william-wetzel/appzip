@@ -2,20 +2,70 @@ import logging
 from pathlib import Path, UnsupportedOperation
 from annotationlib import get_annotations
 import shutil
+import time
+import zipapp
+import datetime as dt
+import os
 
 import msgspec
 from packaging.requirements import Requirement
 from rich.highlighter import JSONHighlighter
+from rich.console import Console
+from rich.progress import Progress
+from rich.progress import (
+    TextColumn,
+    BarColumn,
+    MofNCompleteColumn,
+    TimeRemainingColumn,
+    TaskProgressColumn,
+)
 
-from .utils import format_path, format_node, IS_WIN, SymlinkWarning, prepr, RmtreeError
-from .config import Config, EntryPoints
+from .utils import (
+    format_path,
+    format_node,
+    link,
+    IS_WIN,
+    SymlinkWarning,
+    prepr,
+    RmtreeError,
+    CWD,
+)
+from .config import Config, EntryPoints, load_config
 
+START_TIME = time.perf_counter_ns()
 
 log = logging.getLogger(__name__)
 
 PARENT_PACKAGE = Path(__file__).resolve().parent.parent
 INSTALLER_LIB = PARENT_PACKAGE / "installer"
 INSTALLER_ENTRY_POINT = f"{INSTALLER_LIB.name}:main"
+
+PROGRESS_COLUMNS = (
+    TextColumn("[progress.description]{task.description}"),  # noqa
+    BarColumn(),  # noqa
+    MofNCompleteColumn(),  # noqa
+    TaskProgressColumn(),  # noqa
+    TimeRemainingColumn(compact=True, elapsed_when_finished=True),  # noqa
+)
+
+CONFIG_NAMES = (
+    "appzip.toml",
+    "pyproject.toml",
+)
+
+
+def find_config(path: Path) -> Path:
+    """Search ``path`` for a config file and return it.
+
+    If ``path`` is a file, return it.
+    If no config files are found, return the directory.
+    """
+    if path.is_file():
+        return path
+    for config in (path / name for name in CONFIG_NAMES):
+        if config.exists() and os.access(config, os.R_OK):
+            return config
+    return path
 
 
 def enc_hook(obj):
@@ -123,3 +173,58 @@ def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
         log.warning(f"Ignored unknown file type {node_str}")
         return
     log.debug(f"Copied {node_str}")
+
+
+def pack(cfg: Config, console: Console | None = None):
+    """Pack the project."""
+    if console is None:
+        console = Console(quiet=True)
+
+    # Log config details.
+    if cfg.path.is_file():
+        log.info(f"Config loaded from {format_path(cfg.path)}")
+    else:
+        log.warning(f"Using default config. No config file found in {format_path(cfg.path)}")
+    log.debug(prepr(cfg))
+    if not cfg.version:
+        log.warning("No version info found in config.")
+
+    # Clear the build directory.
+    with console.status("Clearing previous build"):
+        clear_previous_build(cfg.dest_dir)
+
+    # Scan the project files.
+    log.info(f"Scanning {format_path(cfg.base_dir)}")
+    with console.status("Scanning files"):
+        nodes = scan_dir(cfg.base_dir, cfg.include, cfg.exclude)
+
+    # Copy the project files.
+    log.info(f"Copying {len(nodes)} nodes to {format_path(cfg.app_dir)}")
+    with Progress(*PROGRESS_COLUMNS, console=console, transient=True) as progress:
+        for node in progress.track(nodes, description="Copying files"):
+            copy_node(cfg.base_dir, cfg.app_dir, node)
+
+    # Copy the installer resources.
+    log.info(f"Adding installer resources to {format_path(cfg.dest_dir)}")
+    with console.status("Adding installer resources"):
+        add_installer_resources(cfg)
+
+    # Zip the project.
+    log.info(f"Packing installer to {format_path(cfg.installer_path)}")
+    with console.status("Packing installer"):
+        zipapp.create_archive(cfg.dest_dir, cfg.installer_path, main=INSTALLER_ENTRY_POINT)
+
+    # Print exit message.
+    runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
+    log.debug(f"Finished in {runtime}")
+    console.print(f"[finished]Finished in [finished.time]{runtime}[/][/]")
+    console.print(f"[installer.text]Installer: [/]"
+                  f"[installer.path]{link(cfg.installer_path.parent)}[/]"
+                  f"[installer.filename]{link(cfg.installer_path, cfg.installer_path.name)}[/]")
+
+
+def run(path: Path = CWD):
+    """Run appzip on the provided path."""
+    global START_TIME
+    START_TIME = time.perf_counter_ns()
+    pack(load_config(find_config(path.resolve(strict=True))))

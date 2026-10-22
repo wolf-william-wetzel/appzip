@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-appzip = "appzip:app"
+appzip = "appzip.__main__:app"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13"]

@@ -8,7 +8,7 @@ from packaging.specifiers import SpecifierSet
 from packaging.requirements import Requirement
 from packaging.dependency_groups import DependencyGroupResolver
 
-from .utils import link
+from .utils import format_path
 
 
 @dataclass
@@ -125,6 +125,7 @@ class ConfigFile(Base):
 
 class GenConfig:
     """Generated configuration values."""
+    path: Path  # The path used to generate the config.
     log_file: Path  # Filename of log file inside build_dir.
     installer_path: Path  # Filename of final installer file inside dist_dir.
     dest_dir: Path  # Subfolder of build_dir where files are copied.
@@ -150,7 +151,8 @@ class Config(GenConfig):
     include: tuple[str, ...]
     exclude: tuple[str, ...]
 
-    def __init__(self, config: ConfigFile):
+    def __init__(self, config: ConfigFile, path: Path):
+        self.path = path
         # Load values from config file.
         for name in get_annotations(self.__class__):
             self.set_attr_from_config(name, config.tool.appzip, config.project)
@@ -170,9 +172,10 @@ class Config(GenConfig):
             elif (self.base_dir / "__main__.py").exists():
                 self.entry_points.append(EntryPoint(self.name, self.base_dir.name, "appzip.scripts"))
             # No entry points found.
+            elif self.path.is_dir():
+                raise ValidationError(f"No __main__.py found in {format_path(self.path)}")
             else:
-                raise ValidationError(f"{link(self.base_dir)} has no __main__.py and "
-                                      f"no entry points were found in the config file.")
+                raise ValidationError(f"No entry points found in {format_path(self.path)}")
         # Calculate generated values.
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}{f"_{v}" if (v := self.version) else ""}_installer.pyz"
@@ -207,4 +210,4 @@ def load_config(path: Path) -> Config:
     if path.is_file():
         with open(path, encoding="utf-8") as file:
             data = file.read()
-    return Config(toml.decode(data, type=ConfigFile, dec_hook=dec_hook))
+    return Config(toml.decode(data, type=ConfigFile, dec_hook=dec_hook), path)
