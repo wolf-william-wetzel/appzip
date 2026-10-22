@@ -130,8 +130,8 @@ CONFIG_NAMES = (
 
 CONFIG_NAMES_STR = f"{style("config")}|[/]".join(f"{style("config.name")}{name}[/]" for name in CONFIG_NAMES)
 
-PATH_HELP_TEXT = f"""The config file or a directory.
-If it's a directory, it must contain one of
+PATH_HELP_TEXT = f"""Config file or project directory.
+If directory, use default config unless it contains one of
 {style("config")}([/]{CONFIG_NAMES_STR}{style("config")})[/]."""
 
 ERROR_TEXT = """[error.msg]{msg}[/]
@@ -160,26 +160,25 @@ def find_config(path: Path) -> Path:
     """Search ``path`` for a config file and return it.
 
     If ``path`` is a file, return it.
+    If no config files are found, return the directory.
     """
     if path.is_file():
         return path
     for config in (path / name for name in CONFIG_NAMES):
         if config.exists() and os.access(config, os.R_OK):
             return config
-    names = ", ".join(f"'{name}'" for name in CONFIG_NAMES)
-    raise typer.BadParameter(f"'{format_path(path)}' contains no readable file matching {names}.")
+    return path
 
 
 @app.command(epilog=EPILOG)
 def main(
-        config_path: Annotated[Path,
+        path: Annotated[Path,
         typer.Argument(
             show_default=".",
             exists=True,
             resolve_path=True,
             help=PATH_HELP_TEXT,
             callback=find_config,
-            metavar="config",
         )] = CWD,
         log_level: Annotated[LogLevel,
         typer.Option(
@@ -203,12 +202,12 @@ def main(
     # Load the configuration.
     with console.status("Loading configuration"):
         try:
-            cfg = load_config(config_path)
+            cfg = load_config(path)
         except ValidationError as exc:
-            throw_error(f"{link(config_path)} is not a valid config file", exc,
+            throw_error(f"{link(path)} is not a valid config file", exc,
                         "Fix the above issue and try again.")
         except DecodeError as exc:
-            throw_error(f"{link(config_path)} cannot be decoded", exc,
+            throw_error(f"{link(path)} cannot be decoded", exc,
                         "Ensure the file is a valid TOML document.")
 
     # Set up file logging.
@@ -235,8 +234,13 @@ def main(
     )
 
     # Log config details.
-    log.info(f"Config loaded from {format_path(config_path)}")
+    if path.is_file():
+        log.info(f"Config loaded from {format_path(path)}")
+    else:
+        log.warning(f"Using default config. No config file found in {format_path(path)}")
     log.debug(prepr(cfg))
+    if not cfg.version:
+        log.warning("No version info found for current project.")
 
     # Clear the build directory.
     with console.status("Clearing previous build"):

@@ -201,7 +201,10 @@ class Config(GenConfig):
 
 
 def load_config(path: Path) -> Config:
-    """Load a config object from the given file."""
-    BaseDirPath.base = path.parent  # Set the base dir to the config location.
-    with open(path, encoding="utf-8") as file:
-        return Config(toml.decode(file.read(), type=ConfigFile, dec_hook=dec_hook))
+    """Load a config object from the given file or directory."""
+    BaseDirPath.base = path if path.is_dir() else path.parent
+    data = ""
+    if path.is_file():
+        with open(path, encoding="utf-8") as file:
+            data = file.read()
+    return Config(toml.decode(data, type=ConfigFile, dec_hook=dec_hook))
