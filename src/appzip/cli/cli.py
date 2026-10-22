@@ -7,14 +7,14 @@ import os
 
 import typer
 from typer.rich_utils import STYLE_OPTION_ENVVAR, STYLE_OPTION_DEFAULT
-from msgspec import ValidationError, DecodeError
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.theme import Theme
 
 from .config import load_config
 from .packer import pack, find_config, CONFIG_NAMES
-from .utils import format_path, link, CWD, path_abbrev, RmtreeError
+from .utils import format_path, link, CWD, path_abbrev
+from .errors import *
 
 
 class LogLevel(StrEnum):

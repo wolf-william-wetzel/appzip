@@ -3,12 +3,13 @@ from annotationlib import get_annotations
 from platform import python_version
 from dataclasses import dataclass, replace
 
-from msgspec import Struct, field, toml, ValidationError
+from msgspec import Struct, field, toml
 from packaging.specifiers import SpecifierSet
 from packaging.requirements import Requirement
 from packaging.dependency_groups import DependencyGroupResolver
 
 from .utils import format_path
+from .errors import *
 
 
 @dataclass

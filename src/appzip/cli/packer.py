@@ -25,12 +25,11 @@ from .utils import (
     format_node,
     link,
     IS_WIN,
-    SymlinkWarning,
     prepr,
-    RmtreeError,
     CWD,
 )
 from .config import Config, EntryPoints, load_config
+from .errors import *
 
 START_TIME = time.perf_counter_ns()
 
