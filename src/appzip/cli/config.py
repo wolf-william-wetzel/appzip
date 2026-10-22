@@ -8,7 +8,7 @@ from packaging.specifiers import SpecifierSet
 from packaging.requirements import Requirement
 from packaging.dependency_groups import DependencyGroupResolver
 
-from .utils import format_path
+from .utils import Format
 from .errors import *
 
 
@@ -174,9 +174,9 @@ class Config(GenConfig):
                 self.entry_points.append(EntryPoint(self.name, self.base_dir.name, "appzip.scripts"))
             # No entry points found.
             elif self.path.is_dir():
-                raise ValidationError(f"No __main__.py found in {format_path(self.path)}")
+                raise ValidationError(f"No __main__.py found in {Format.path(self.path)}")
             else:
-                raise ValidationError(f"No entry points found in {format_path(self.path)}")
+                raise ValidationError(f"No entry points found in {Format.path(self.path)}")
         # Calculate generated values.
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}{f"_{v}" if (v := self.version) else ""}_installer.pyz"

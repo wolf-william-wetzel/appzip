@@ -4,7 +4,7 @@ from pathlib import Path
 
 from msgspec import DecodeError, ValidationError
 
-from .utils import format_path
+from .utils import Format
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class AppzipError(Exception):
 
 class RmtreeError(AppzipError):
     def __init__(self, base: Path, failures: list[tuple[str, BaseException]]):
-        super().__init__("\n".join(f"{format_path(Path(n), base)} -> {e}" for n, e in failures))
+        super().__init__("\n".join(f"{Format.path(Path(n), base)} -> {e}" for n, e in failures))
 
 
 class AppzipWarning(Warning):

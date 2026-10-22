@@ -13,7 +13,7 @@ from rich.theme import Theme
 
 from .config import load_config
 from .packer import pack, find_config, CONFIG_NAMES
-from .utils import format_path, link, CWD, path_abbrev
+from .utils import CWD, Format
 from .errors import *
 
 
@@ -93,7 +93,7 @@ def style(style_str: str):
 
 REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
 EPILOG = f"""This software is free and open source.
-{style("help.url")}{link(REPO_LINK, REPO_LINK)}[/]"""
+{style("help.url")}{Format.link(REPO_LINK, REPO_LINK)}[/]"""
 
 DEBUG_ENV_VAR = "DEBUG"
 LOG_HELP_TEXT = f"""Filter logs by severity.
@@ -163,10 +163,10 @@ def main(
         try:
             cfg = load_config(path)
         except ValidationError as exc:
-            throw_error(f"{link(path)} is not a valid config file", exc,
+            throw_error(f"{Format.link(path)} is not a valid config file", exc,
                         "Fix the above issue and try again.")
         except DecodeError as exc:
-            throw_error(f"{link(path)} cannot be decoded", exc,
+            throw_error(f"{Format.link(path)} cannot be decoded", exc,
                         "Ensure the file is a valid TOML document.")
 
     # Set up file logging.
@@ -187,7 +187,7 @@ def main(
             rich_tracebacks=True,
             log_time_format="[%H:%M:%S.%f]",
             show_path=False,
-            keywords=[f" {abbrev}/" for abbrev in path_abbrev.values()],
+            keywords=[f" {g}/" for g in Format.glyphs.values()],
         ),
         "%(message)s"
     )
@@ -196,5 +196,5 @@ def main(
     try:
         pack(cfg, console)
     except RmtreeError as exc:
-        throw_error(f"Cannot delete the following files from {format_path(cfg.dest_dir)}", exc,
-                    f"Clear all files from {link(cfg.dest_dir)}")
+        throw_error(f"Cannot delete the following files from {Format.path(cfg.dest_dir)}", exc,
+                    f"Clear all files from {Format.link(cfg.dest_dir)}")

@@ -23,7 +23,7 @@ from rich.progress import (
     TaskProgressColumn,
 )
 
-from .utils import format_path, format_node, link, CWD
+from .utils import CWD, Format
 from .config import Config, EntryPoints, load_config
 from .errors import *
 
@@ -92,10 +92,10 @@ class Metadata(msgspec.Struct):
 def add_installer_resources(cfg: Config):
     """Add the installer resources to the current build."""
     # Copy the installer lib.
-    log.info(f"Copying installer lib to {format_path(cfg.dest_dir / INSTALLER_LIB.name)}/")
+    log.info(f"Copying installer lib to {Format.path(cfg.dest_dir / INSTALLER_LIB.name)}/")
     INSTALLER_LIB.copy_into(cfg.dest_dir)
     # Write metadata.
-    log.info(f"Writing installer metadata to {format_path(cfg.metadata_file)}")
+    log.info(f"Writing installer metadata to {Format.path(cfg.metadata_file)}")
     with open(cfg.metadata_file, "wb") as f:
         metadata = Metadata.from_config(cfg)
         log.debug(prepr(metadata))
@@ -108,7 +108,7 @@ def clear_previous_build(path: Path):
     """Clear ``path`` with ``shutil.rmtree``. Raise ``RmtreeError`` if any errors occurred."""
     failures: list[tuple[str, BaseException]] = []
     if path.exists():
-        log.info(f"Clearing previous build from {format_path(path)}")
+        log.info(f"Clearing previous build from {Format.path(path)}")
         shutil.rmtree(path, onexc=lambda _, n, e: failures.append((n, e)))
     if failures:
         raise RmtreeError(path, failures)
@@ -134,14 +134,14 @@ def scan_dir(folder: Path, include: tuple[str, ...], exclude: tuple[str, ...]) -
 
 def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
     dest_node = dest_dir / src_node.relative_to(src_dir)
-    node_str = format_node(src_node, src_dir)
+    node_str = Format.node(src_node, src_dir)
 
     if not dest_node.parent.exists():
         dest_node.parent.mkdir(parents=True, exist_ok=True)
 
     if src_node.is_symlink():
         real_node = src_node.resolve()
-        node_str = format_node(src_node, src_dir, real_node)
+        node_str = Format.node(src_node, src_dir, real_node)
         if src_dir not in real_node.parents:
             log.warning(f"Ignored external symlink {node_str}")
             return
@@ -180,9 +180,9 @@ def pack(cfg: Config, console: Console | None = None):
 
     # Log config details.
     if cfg.path.is_file():
-        log.info(f"Config loaded from {format_path(cfg.path)}")
+        log.info(f"Config loaded from {Format.path(cfg.path)}")
     else:
-        log.warning(f"Using default config. No config file found in {format_path(cfg.path)}")
+        log.warning(f"Using default config. No config file found in {Format.path(cfg.path)}")
     log.debug(prepr(cfg))
     if not cfg.version:
         log.warning("No version info found in config.")
@@ -192,23 +192,23 @@ def pack(cfg: Config, console: Console | None = None):
         clear_previous_build(cfg.dest_dir)
 
     # Scan the project files.
-    log.info(f"Scanning {format_path(cfg.base_dir)}")
+    log.info(f"Scanning {Format.path(cfg.base_dir)}")
     with console.status("Scanning files"):
         nodes = scan_dir(cfg.base_dir, cfg.include, cfg.exclude)
 
     # Copy the project files.
-    log.info(f"Copying {len(nodes)} nodes to {format_path(cfg.app_dir)}")
+    log.info(f"Copying {len(nodes)} nodes to {Format.path(cfg.app_dir)}")
     with Progress(*PROGRESS_COLUMNS, console=console, transient=True) as progress:
         for node in progress.track(nodes, description="Copying files"):
             copy_node(cfg.base_dir, cfg.app_dir, node)
 
     # Copy the installer resources.
-    log.info(f"Adding installer resources to {format_path(cfg.dest_dir)}")
+    log.info(f"Adding installer resources to {Format.path(cfg.dest_dir)}")
     with console.status("Adding installer resources"):
         add_installer_resources(cfg)
 
     # Zip the project.
-    log.info(f"Packing installer to {format_path(cfg.installer_path)}")
+    log.info(f"Packing installer to {Format.path(cfg.installer_path)}")
     with console.status("Packing installer"):
         zipapp.create_archive(cfg.dest_dir, cfg.installer_path, main=INSTALLER_ENTRY_POINT)
 
@@ -217,8 +217,8 @@ def pack(cfg: Config, console: Console | None = None):
     log.debug(f"Finished in {runtime}")
     console.print(f"[finished]Finished in [finished.time]{runtime}[/][/]")
     console.print(f"[installer.text]Installer: [/]"
-                  f"[installer.path]{link(cfg.installer_path.parent)}[/]"
-                  f"[installer.filename]{link(cfg.installer_path, cfg.installer_path.name)}[/]")
+                  f"[installer.path]{Format.link(cfg.installer_path.parent)}[/]"
+                  f"[installer.filename]{Format.link(cfg.installer_path, cfg.installer_path.name)}[/]")
 
 
 def run(path: Path = CWD):
