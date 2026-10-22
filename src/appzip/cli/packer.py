@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 PARENT_PACKAGE = Path(__file__).resolve().parent.parent
 INSTALLER_LIB = PARENT_PACKAGE / "installer"
-INSTALLER_ENTRY_POINT = PARENT_PACKAGE / "installer_ep.py"
+INSTALLER_ENTRY_POINT = f"{INSTALLER_LIB.name}:main"
 
 
 def enc_hook(obj):
@@ -46,9 +46,6 @@ def add_installer_resources(cfg: Config):
     # Copy the installer lib.
     log.info(f"Copying installer lib to {format_path(cfg.dest_dir / INSTALLER_LIB.name)}/")
     INSTALLER_LIB.copy_into(cfg.dest_dir)
-    # Copy the installer entry point.
-    log.info(f"Copying installer entry point to {format_path(cfg.entry_point)}")
-    INSTALLER_ENTRY_POINT.copy(cfg.entry_point)
     # Write metadata.
     log.info(f"Writing installer metadata to {format_path(cfg.metadata_file)}")
     with open(cfg.metadata_file, "wb") as f:

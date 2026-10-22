@@ -24,7 +24,7 @@ from rich.progress import (
 )
 
 from .config import load_config
-from .packer import scan_dir, copy_node, add_installer_resources, clear_previous_build
+from .packer import scan_dir, copy_node, add_installer_resources, clear_previous_build, INSTALLER_ENTRY_POINT
 from .utils import format_path, link, CWD, path_abbrev, prepr, RmtreeError
 
 START_TIME = time.perf_counter_ns()
@@ -265,7 +265,7 @@ def main(
     # Zip the project.
     log.info(f"Packing installer to {format_path(cfg.installer_path)}")
     with console.status("Packing installer"):
-        zipapp.create_archive(cfg.dest_dir, cfg.installer_path)
+        zipapp.create_archive(cfg.dest_dir, cfg.installer_path, main=INSTALLER_ENTRY_POINT)
 
     # Print exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
