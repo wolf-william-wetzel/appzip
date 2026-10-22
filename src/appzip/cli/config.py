@@ -92,8 +92,8 @@ class Base(Struct, frozen=True, rename="kebab"):
 
 
 class Project(Base):
-    name: str
-    version: str | None = None
+    name: str = field(default_factory=lambda: BaseDirPath.base.name)
+    version: str = ""
     description: str = ""
     requires_python: SpecifierSet = SpecifierSet(f">={python_version()}")
     dependencies: list[Requirement] = []
@@ -117,9 +117,10 @@ class Tool(Base):
 
 class ConfigFile(Base):
     """Represents the entire configuration file."""
-    project: Project
+    # Any table with a default that relies on base dir needs to be lazily loaded via default_factory.
+    project: Project = field(default_factory=Project)
     dependency_groups: DependencyGroupResolver = DependencyGroupResolver({})
-    tool: Tool = field(default_factory=Tool)  # Tool and all subtables need lazily loaded defaults.
+    tool: Tool = field(default_factory=Tool)
 
 
 class GenConfig:
@@ -174,7 +175,7 @@ class Config(GenConfig):
                                       f"no entry points were found in the config file.")
         # Calculate generated values.
         self.log_file = self.build_dir / "build.log"
-        self.installer_path = self.dist_dir / f"{self.name}_{self.version}_installer.pyz"
+        self.installer_path = self.dist_dir / f"{self.name}{f"_{v}" if (v := self.version) else ""}_installer.pyz"
         self.dest_dir = self.build_dir / self.installer_path.stem
         self.app_dir = self.dest_dir / "app" / self.base_dir.name
         self.metadata_file = self.dest_dir / "metadata.json"
