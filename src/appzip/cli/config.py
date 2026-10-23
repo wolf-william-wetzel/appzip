@@ -1,6 +1,6 @@
 from pathlib import Path
 from annotationlib import get_annotations
-from platform import python_version
+from platform import python_version_tuple
 from dataclasses import dataclass, replace
 import os
 
@@ -11,6 +11,8 @@ from packaging.dependency_groups import DependencyGroupResolver
 
 from .utils import Format
 from .errors import *
+
+PY_VER = python_version_tuple()
 
 CONFIG_NAMES = (
     "appzip.toml",
@@ -102,7 +104,7 @@ class Project(Base):
     name: str = field(default_factory=lambda: BaseDirPath.base.name)
     version: str = ""
     description: str = ""
-    requires_python: SpecifierSet = SpecifierSet(f">={python_version()}")
+    requires_python: SpecifierSet = SpecifierSet(f">={PY_VER[0]}.{PY_VER[1]}")
     dependencies: list[Requirement] = []
     scripts: EntryPoints = EntryPoints()
     gui_scripts: EntryPoints = EntryPoints()
@@ -192,9 +194,10 @@ class Config(GenConfig):
         self.app_dir = self.dest_dir / "app" / self.base_dir.name
         self.metadata_file = self.dest_dir / "metadata.json"
         self.entry_point = self.dest_dir / "__main__.py"
-        if not (minor := next(self.requires_python.filter(range(14, 255), key=lambda i: f"3.{i}"), 0)):
+        major = int(PY_VER[0])
+        if not (minor := next(self.requires_python.filter(range(14, 255), key=lambda i: f"{major}.{i}"), 0)):
             raise ValidationError(f"Minimum python version couldn't be determined from '{self.requires_python!s}'")
-        self.minimum_python = int(f"3{minor:0>2x}00f0", 16)
+        self.minimum_python = int(f"{major:x}{minor:0>2x}00f0", 16)
 
     def set_attr_from_config(self, name: str, *tables: Struct):
         """Set attribute ``name`` from ``tables``, searching sequentially.
