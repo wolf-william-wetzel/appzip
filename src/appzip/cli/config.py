@@ -167,16 +167,18 @@ class Config(GenConfig):
         if not self.entry_points:
             # Load entry points from project table.
             if self.scripts or self.gui_scripts:
-                self.entry_points.extend(ep.with_group("console-scripts") for ep in self.scripts)
-                self.entry_points.extend(ep.with_group("gui-scripts") for ep in self.gui_scripts)
+                self.entry_points.extend(ep.with_group("appzip.ep.console") for ep in self.scripts)
+                self.entry_points.extend(ep.with_group("appzip.ep.app.w") for ep in self.gui_scripts)
             # Use __main__.py as an entry point.
             elif (self.base_dir / "__main__.py").exists():
-                self.entry_points.append(EntryPoint(self.name, self.base_dir.name, "appzip.scripts"))
+                self.entry_points.append(EntryPoint(self.name, self.base_dir.name, "appzip.ep.app"))
+            # Use __main__.pyw as an entry point.
+            elif (self.base_dir / "__main__.pyw").exists():
+                self.entry_points.append(EntryPoint(self.name, self.base_dir.name, "appzip.ep.app.w"))
             # No entry points found.
-            elif self.path.is_dir():
-                raise ValidationError(f"No __main__.py found in {Format.path(self.path)}")
             else:
-                raise ValidationError(f"No entry points found in {Format.path(self.path)}")
+                missing = "__main__.py[w]" if self.path.is_dir() else "entry points"
+                raise ValidationError(f"No {missing} found in {Format.path(self.path)}")
         # Calculate generated values.
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}{f"_{v}" if (v := self.version) else ""}_installer.pyz"

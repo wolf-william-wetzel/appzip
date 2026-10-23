@@ -18,13 +18,13 @@ default = "testproject:main.main"
 [project.gui-scripts]
 default_gui = "testproject:main.main"
 
-[project.entry-points."appzip.scripts"]
+[project.entry-points."appzip.ep"]
 testapp = "testproject"
 
-[project.entry-points."appzip.scripts.console"]
+[project.entry-points."appzip.ep.console"]
 testapp_console = "testproject"
 
-[project.entry-points."appzip.scripts.gui"]
+[project.entry-points."appzip.ep.app.w"]
 testapp_gui = "testproject"
 
 [tool.appzip]
