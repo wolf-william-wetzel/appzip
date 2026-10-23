@@ -2,6 +2,7 @@ from pathlib import Path
 from annotationlib import get_annotations
 from platform import python_version
 from dataclasses import dataclass, replace
+import os
 
 from msgspec import Struct, field, toml
 from packaging.specifiers import SpecifierSet
@@ -10,6 +11,11 @@ from packaging.dependency_groups import DependencyGroupResolver
 
 from .utils import Format
 from .errors import *
+
+CONFIG_NAMES = (
+    "appzip.toml",
+    "pyproject.toml",
+)
 
 
 @dataclass
@@ -205,12 +211,26 @@ class Config(GenConfig):
         for name, value in vars(self).items():
             yield name, value
 
-
-def load_config(path: Path) -> Config:
-    """Load a config object from the given file or directory."""
-    BaseDirPath.base = path if path.is_dir() else path.parent
-    data = ""
-    if path.is_file():
-        with open(path, encoding="utf-8") as file:
-            data = file.read()
-    return Config(toml.decode(data, type=ConfigFile, dec_hook=dec_hook), path)
+    @classmethod
+    def load(cls, path: Path):
+        """Load a ``Config`` object from the given file or directory."""
+        # Resolve the path.
+        try:
+            path = path.resolve(strict=True)
+        except OSError:
+            raise ValidationError(f"'{path}' does not exist or contains symlink loops") from None
+        # Find the config file.
+        if path.is_dir():
+            for config in (path / name for name in CONFIG_NAMES):
+                if config.exists() and os.access(config, os.R_OK):
+                    path = config
+                    break
+        # Update base directory.
+        BaseDirPath.base = path if path.is_dir() else path.parent
+        # Load the data if path is a file.
+        data: str = ""
+        if path.is_file():
+            with open(path, encoding="utf-8") as file:
+                data = file.read()
+        # Decode the configuration and return the config object.
+        return Config(toml.decode(data, type=ConfigFile, dec_hook=dec_hook), path)

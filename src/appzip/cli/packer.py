@@ -5,7 +5,6 @@ import shutil
 import time
 import zipapp
 import datetime as dt
-import os
 import sys
 from functools import partial
 
@@ -24,7 +23,7 @@ from rich.progress import (
 )
 
 from .utils import CWD, Format
-from .config import Config, EntryPoints, load_config
+from .config import Config, EntryPoints
 from .errors import *
 
 START_TIME = time.perf_counter_ns()
@@ -45,25 +44,6 @@ PROGRESS_COLUMNS = (
     TaskProgressColumn(),  # noqa
     TimeRemainingColumn(compact=True, elapsed_when_finished=True),  # noqa
 )
-
-CONFIG_NAMES = (
-    "appzip.toml",
-    "pyproject.toml",
-)
-
-
-def find_config(path: Path) -> Path:
-    """Search ``path`` for a config file and return it.
-
-    If ``path`` is a file, return it.
-    If no config files are found, return the directory.
-    """
-    if path.is_file():
-        return path
-    for config in (path / name for name in CONFIG_NAMES):
-        if config.exists() and os.access(config, os.R_OK):
-            return config
-    return path
 
 
 def enc_hook(obj):
@@ -225,4 +205,4 @@ def run(path: Path = CWD):
     """Run appzip on the provided path."""
     global START_TIME
     START_TIME = time.perf_counter_ns()
-    pack(load_config(find_config(path.resolve(strict=True))))
+    pack(Config.load(path))

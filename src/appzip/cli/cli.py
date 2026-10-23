@@ -11,8 +11,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.theme import Theme
 
-from .config import load_config
-from .packer import pack, find_config, CONFIG_NAMES
+from .config import CONFIG_NAMES, Config
+from .packer import pack
 from .utils import CWD, Format
 from .errors import *
 
@@ -137,7 +137,6 @@ def main(
             exists=True,
             resolve_path=True,
             help=PATH_HELP_TEXT,
-            callback=find_config,
         )] = CWD,
         log_level: Annotated[LogLevel,
         typer.Option(
@@ -156,14 +155,14 @@ def main(
         )] = False,
     ):
     """
-    Pack a python app into a cross-platform zip file. [bold]:snake:->:package:->:computer:[/]
+    Pack a python app into a cross-platform executable zip file. [bold]:snake:->:package:->:computer:[/]
     """
     # Load the configuration.
     with console.status("Loading configuration"):
         try:
-            cfg = load_config(path)
+            cfg = Config.load(path)
         except ValidationError as exc:
-            throw_error(f"{Format.link(path)} is not a valid config file", exc,
+            throw_error(f"{Format.link(path)} is not a valid config path", exc,
                         "Fix the above issue and try again.")
         except DecodeError as exc:
             throw_error(f"{Format.link(path)} cannot be decoded", exc,
