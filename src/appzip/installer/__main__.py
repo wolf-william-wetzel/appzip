@@ -1,6 +1,6 @@
 from .metadata import Metadata
-import sys
-import platform
+from sys import hexversion
+from platform import python_version
 
 
 def main():
@@ -8,9 +8,9 @@ def main():
     metadata = Metadata()
 
     # Verify proper python version.
-    if metadata.minimum_python > sys.hexversion:
-        minor = int(f"{metadata.minimum_python:0>8x}"[2:4], base=16)
-        raise SystemExit(f"Installer requires Python >=3.{minor}, not {platform.python_version()}")
+    if metadata.minimum_python > hexversion:
+        s = f"{metadata.minimum_python:0>8x}"
+        raise SystemExit(f"Installer requires Python >={int(s[:2], 16)}.{int(s[2:4], 16)}, not {python_version()}")
 
     # Exit message.
     print("Done!")
