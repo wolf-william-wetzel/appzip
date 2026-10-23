@@ -1,2 +1,9 @@
+from .metadata import Metadata
+
+
 def main():
-    print("Hello world!")
+    print("Running installer...")
+    metadata = Metadata()
+    print(metadata.name)
+    print(metadata.version)
+    print(metadata.description)
