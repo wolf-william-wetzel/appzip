@@ -1,4 +1,3 @@
-import sys
 import logging
 
 from .colorize import get_theme
@@ -32,21 +31,21 @@ class ThemeFormatter(logging.Formatter):
 
 
 class Console:
-    def __init__(self, file=sys.stdout):
+    """Console object for easy terminal styles."""
+    def __init__(self, file=None):
+        """If ``file`` is ``None``, default to ``sys.stdout``."""
         self.file = file
         self.theme = get_theme(file)
+        self.interactive = self.theme.reset != ""
 
     def get_logging_handler(self):
         handler = logging.StreamHandler(self.file)
         handler.setFormatter(ThemeFormatter(self.theme))
         return handler
 
-    def print(self, text: str, clear_styles: bool = True):
-        """Prints ``text`` styled with rich-like markup.
-
-        If ``clear_styles``, styles will be reset at the end of the text.
-        """
-        print(self.theme.style(text, clear_styles), file=self.file)
+    def print(self, value, end: str = "\n", flush: bool = False):
+        """Prints ``value`` styled with rich-like markup."""
+        print(self.theme.style(str(value)), end=end, flush=flush, file=self.file)
 
     def exit(self, message: str, code: int = 1):
         """Print a styled message, then raise ``SystemExit(code)``."""

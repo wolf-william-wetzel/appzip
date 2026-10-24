@@ -73,6 +73,7 @@ def decolor(text: str) -> str:
 
 
 def can_colorize(file=None) -> bool:
+    """Copied from the Python 3.15 stdlib with some modifications."""
     def _safe_getenv(k: str, fallback: str | None = None) -> str | None:
         try:
             return os.environ.get(k, fallback)
@@ -93,7 +94,7 @@ def can_colorize(file=None) -> bool:
         return False
     if _safe_getenv("FORCE_COLOR"):
         return True
-    if _safe_getenv("TERM") == "dumb":
+    if _safe_getenv("TERM") in ("dumb", "unknown"):
         return False
 
     if not hasattr(file, "fileno"):
@@ -110,7 +111,10 @@ def can_colorize(file=None) -> bool:
     try:
         return os.isatty(file.fileno())
     except OSError:
-        return hasattr(file, "isatty") and file.isatty()
+        try:
+            return hasattr(file, "isatty") and file.isatty()
+        except ValueError:
+            return False
 
 
 @dataclass
@@ -196,4 +200,5 @@ class Theme:
 
 
 def get_theme(file=None) -> Theme:
+    """Get a styled or non-styled Theme object. ``file`` defaults to ``sys.stdout``."""
     return Theme() if can_colorize(file) else Theme.no_colors()
