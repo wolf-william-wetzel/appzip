@@ -57,7 +57,7 @@ theme = Theme({
     "installer.filename": "bright_yellow",
     # 'finished': exit message about elapsed time
     "finished": "dim",
-    "finished.time": "cyan",
+    "finished.time": "bright_green",
     # 'version': version info CLI option
     "version.number": "bold cyan",
     "version.error": "bold red",

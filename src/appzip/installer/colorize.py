@@ -106,6 +106,8 @@ def can_colorize(file=None) -> bool:
 @dataclass
 class Theme:
     reset: str = SGR.RESET
+    # Standard styles.
+    dim: str = SGR.DIM
     # Logging.
     log_time: str = SGR.DIM + SGR.CYAN
     log_debug: str = SGR.GREEN
@@ -117,6 +119,8 @@ class Theme:
     # Console text.
     name: str = SGR.GREEN
     version: str = SGR.CYAN + SGR.BOLD
+    error: str = SGR.RED + SGR.BOLD
+    runtime: str = SGR.LIGHT_GREEN
 
     def __post_init__(self):
         self.log_levels = {
@@ -134,7 +138,25 @@ class Theme:
     def __format__(self, spec: str) -> str:
         if spec in self.log_levels:
             return f"{self.log_levels[spec]}{spec:<8}{self.reset}"
-        return format(repr(self), spec)
+        return self.style(spec, reset=True)
+
+    def style(self, text: str, reset: bool = True) -> str:
+        """Style ``text`` with rich-like markup."""
+        for f in fields(self):
+            if f.init:
+                text = text.replace(f"[{f.name}]", getattr(self, f.name))
+        return text.replace("[/]", self.reset) + (self.reset if reset else "")
+
+    def print(self, text: str, reset: bool = True):
+        """Shortcut for ``print(Theme.style(text))``.
+
+        If ``reset``, ``Theme.reset`` will be appended to ``text``.
+        """
+        print(self.style(text, reset=reset))
+
+    def exit(self, text: str):
+        """Raise ``SystemExit`` with a styled message."""
+        raise SystemExit(get_theme(sys.stderr).style(text, reset=True))
 
 
 def get_theme(file=None) -> Theme:
