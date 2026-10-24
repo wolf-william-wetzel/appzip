@@ -1,6 +1,6 @@
 import logging
 
-from .colorize import get_theme
+from .colorize import get_theme, is_term
 
 
 class ThemeFormatter(logging.Formatter):
@@ -36,7 +36,7 @@ class Console:
         """If ``file`` is ``None``, default to ``sys.stdout``."""
         self.file = file
         self.theme = get_theme(file)
-        self.interactive = self.theme.reset != ""
+        self.interactive = is_term(file)
 
     def get_logging_handler(self):
         handler = logging.StreamHandler(self.file)

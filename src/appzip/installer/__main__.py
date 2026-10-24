@@ -31,6 +31,7 @@ def fatal(message: str, code: int = 1):
 def main():
     # Opening message.
     console.print("[dim]Running installer...")
+    log.debug(f"Interactive: {console.interactive}")
 
     # Load metadata.
     log.info("Loading metadata...")

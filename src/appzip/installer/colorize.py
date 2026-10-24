@@ -2,8 +2,6 @@ import os
 import sys
 from dataclasses import dataclass, fields
 
-COLORIZE = True
-
 
 class SGR:
     RESET = "\x1b[0m"
@@ -72,17 +70,36 @@ def decolor(text: str) -> str:
     return text
 
 
-def can_colorize(file=None) -> bool:
+def _safe_getenv(k: str, fallback: str | None = None) -> str | None:
     """Copied from the Python 3.15 stdlib with some modifications."""
-    def _safe_getenv(k: str, fallback: str | None = None) -> str | None:
-        try:
-            return os.environ.get(k, fallback)
-        except Exception:  # noqa
-            return fallback
+    try:
+        return os.environ.get(k, fallback)
+    except Exception:  # noqa
+        return fallback
 
+
+def is_term(file=None) -> bool:
+    """Copied from the Python 3.15 stdlib with some modifications."""
     if file is None:
         file = sys.stdout
 
+    if _safe_getenv("TERM") in ("dumb", "unknown"):
+        return False
+
+    if not hasattr(file, "fileno"):
+        return False
+
+    try:
+        return os.isatty(file.fileno())
+    except OSError:
+        try:
+            return hasattr(file, "isatty") and file.isatty()
+        except ValueError:
+            return False
+
+
+def can_colorize(file=None) -> bool:
+    """Copied from the Python 3.15 stdlib with some modifications."""
     if not sys.flags.ignore_environment:
         if _safe_getenv("PYTHON_COLORS") == "0":
             return False
@@ -90,15 +107,8 @@ def can_colorize(file=None) -> bool:
             return True
     if _safe_getenv("NO_COLOR"):
         return False
-    if not COLORIZE:
-        return False
     if _safe_getenv("FORCE_COLOR"):
         return True
-    if _safe_getenv("TERM") in ("dumb", "unknown"):
-        return False
-
-    if not hasattr(file, "fileno"):
-        return False
 
     if sys.platform == "win32":
         try:
@@ -108,13 +118,7 @@ def can_colorize(file=None) -> bool:
         except (ImportError, AttributeError):
             return False
 
-    try:
-        return os.isatty(file.fileno())
-    except OSError:
-        try:
-            return hasattr(file, "isatty") and file.isatty()
-        except ValueError:
-            return False
+    return is_term(file)
 
 
 @dataclass
