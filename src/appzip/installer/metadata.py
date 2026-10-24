@@ -1,10 +1,5 @@
-import json
-from zipfile import ZipFile
-from pathlib import Path
 from dataclasses import dataclass
-from pprint import pformat
-
-PYZ_PATH = Path(__file__).parent.parent
+import json
 
 
 @dataclass
@@ -25,12 +20,7 @@ class EntryPoint:
         self.windowed = self.group.endswith(".w")
 
 
-def json_object_hook(obj: dict):
-    if obj.keys() == {"name", "value", "group"}:
-        return EntryPoint(**obj)
-    return obj
-
-
+@dataclass
 class Metadata:
     name: str
     version: str
@@ -39,19 +29,12 @@ class Metadata:
     dependencies: list[str]
     entry_points: list[EntryPoint]
 
-    def __init__(self):
-        with ZipFile(PYZ_PATH) as zf:
-            self.data = json.loads(zf.read("metadata.json").decode("utf-8"), object_hook=json_object_hook)
+    @staticmethod
+    def _json_object_hook(obj: dict):
+        if obj.keys() == {"name", "value", "group"}:
+            return EntryPoint(**obj)
+        return obj
 
-    def __getattr__(self, name: str):
-        if name not in self.data:
-            raise AttributeError(f"Unknown metadata attribute: '{name}'")
-        return self.data[name]
-
-    def __repr__(self):
-        return pformat(
-            self.data,
-            indent=2,
-            expand=True,
-            sort_dicts=False,
-        ).replace("\n", "\n" + " " * 24).replace("EntryPoint", "[magenta]EntryPoint[/]")
+    @classmethod
+    def from_json(cls, json_str: str | bytes | bytearray):
+        return cls(**json.loads(json_str, object_hook=cls._json_object_hook))

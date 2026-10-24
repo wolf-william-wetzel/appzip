@@ -4,11 +4,14 @@ import logging
 import os
 import time
 import datetime as dt
+from pathlib import Path
+from zipfile import ZipFile
 
 from .metadata import Metadata
 from .colorize import get_theme
 
 START_TIME = time.perf_counter_ns()
+PYZ_PATH = Path(__file__).parent.parent
 
 log = logging.getLogger()
 
@@ -30,11 +33,12 @@ logging.basicConfig(
 
 def main():
     # Opening message.
-    theme.print("[dim]Installing...")
+    theme.print("[dim]Running installer...")
 
     # Load metadata.
     log.info("Loading metadata...")
-    metadata = Metadata()
+    with ZipFile(PYZ_PATH) as zf:
+        metadata = Metadata.from_json(zf.read("metadata.json"))
     log.debug(metadata)
 
     # Verify proper python version.
