@@ -1,6 +1,6 @@
 import os
 import sys
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
 
 COLORIZE = True
 
@@ -108,15 +108,33 @@ class Theme:
     reset: str = SGR.RESET
     # Logging.
     log_time: str = SGR.DIM + SGR.CYAN
-    log_debug: str = SGR.BLUE
-    log_info: str = SGR.GREEN
+    log_debug: str = SGR.GREEN
+    log_info: str = SGR.BLUE
     log_warning: str = SGR.LIGHT_YELLOW
     log_error: str = SGR.BOLD + SGR.LIGHT_RED
     log_critical: str = SGR.BOLD + SGR.LIGHT_RED + SGR.REVERSE
+    log_levels: dict[str, str] = field(init=False)
+    # Console text.
+    name: str = SGR.GREEN
+    version: str = SGR.CYAN + SGR.BOLD
+
+    def __post_init__(self):
+        self.log_levels = {
+            "DEBUG": self.log_debug,
+            "INFO": self.log_info,
+            "WARNING": self.log_warning,
+            "ERROR": self.log_error,
+            "CRITICAL": self.log_critical,
+        }
 
     @classmethod
     def no_colors(cls):
-        return cls(**{f.name: "" for f in fields(cls)})
+        return cls(**{f.name: "" for f in fields(cls) if f.init})
+
+    def __format__(self, spec: str) -> str:
+        if spec in self.log_levels:
+            return f"{self.log_levels[spec]}{spec:<8}{self.reset}"
+        return format(repr(self), spec)
 
 
 def get_theme(file=None) -> Theme:

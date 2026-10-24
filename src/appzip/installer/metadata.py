@@ -2,6 +2,7 @@ import json
 from zipfile import ZipFile
 from pathlib import Path
 from dataclasses import dataclass
+from pprint import pformat
 
 PYZ_PATH = Path(__file__).parent.parent
 
@@ -46,3 +47,6 @@ class Metadata:
         if name not in self.data:
             raise AttributeError(f"Unknown metadata attribute: '{name}'")
         return self.data[name]
+
+    def __repr__(self):
+        return pformat(self.data, indent=2, expand=True).replace("\n", "\n" + " " * 24)

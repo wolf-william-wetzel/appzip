@@ -15,6 +15,7 @@ INSTALL_COMMAND = [*EXE, "testproject/dist/testapp_1.2.3_installer.pyz"]
 COMMANDS = {
     "pack": [PACK_COMMAND],
     "install": [PACK_COMMAND, INSTALL_COMMAND],
+    "reinstall": [INSTALL_COMMAND],
 }
 DEFAULT = "pack"
 

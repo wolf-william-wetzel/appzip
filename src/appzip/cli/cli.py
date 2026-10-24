@@ -175,7 +175,7 @@ def main(
             mode="w",
             encoding="utf-8"
         ),
-        "%(asctime)s.%(msecs)d %(filename)s:%(lineno)d:%(levelname)s %(message)s",
+        "[%(asctime)s.%(msecs)d] %(filename)s:%(lineno)d:%(levelname)s %(message)s",
         "%Y-%m-%d %H:%M:%S"
     )
     # Set up console logging.
