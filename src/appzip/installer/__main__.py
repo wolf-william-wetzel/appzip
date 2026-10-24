@@ -8,32 +8,29 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from .metadata import Metadata
-from .colorize import get_theme
+from .console import Console
 
 START_TIME = time.perf_counter_ns()
 PYZ_PATH = Path(__file__).parent.parent
 
+console = Console(sys.stdout)
+
 log = logging.getLogger()
-
-STREAM = sys.stdout
-theme = get_theme(STREAM)
-
-# noinspection PyArgumentList
 logging.basicConfig(
-    stream=STREAM,
     level=logging.DEBUG if os.environ.get("DEBUG") else logging.WARNING,
-    formatter=logging.Formatter(
-        fmt="{theme.log_time}[{asctime}.{msecs:0<3.0f}]{theme.reset} {theme:{levelname}} {theme:{message}}",
-        datefmt="%H:%M:%S",
-        style="{",
-        defaults={"theme": theme},
-    )
+    handlers=[console.get_logging_handler()],
 )
+
+
+def fatal(message: str, code: int = 1):
+    """Exit due to fatal error."""
+    log.critical(message)
+    console.exit(message, code)
 
 
 def main():
     # Opening message.
-    theme.print("[dim]Running installer...")
+    console.print("[dim]Running installer...")
 
     # Load metadata.
     log.info("Loading metadata...")
@@ -45,10 +42,10 @@ def main():
     log.debug("Checking python version...")
     if metadata.minimum_python > sys.hexversion:
         s = f"{metadata.minimum_python:0>8x}"
-        theme.exit(f"[error]Installer requires Python >={int(s[:2], 16)}.{int(s[2:4], 16)}, not {python_version()}")
+        fatal(f"[error]Installer requires Python >={int(s[:2], 16)}.{int(s[2:4], 16)}, not {python_version()}")
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
     log.debug(f"Finished in [runtime]{runtime}")
-    theme.print(f"[dim]Finished in [runtime]{runtime}")
-    theme.print(f"Installed [name]{metadata.name}[/] [version]{metadata.version}[/]")
+    console.print(f"[dim]Finished in [runtime]{runtime}")
+    console.print(f"Installed [name]{metadata.name}[/] [version]{metadata.version}[/]")

@@ -1,12 +1,13 @@
 import os
 import sys
-from dataclasses import dataclass, fields, field
+from dataclasses import dataclass, fields
 
 COLORIZE = True
 
 
 class SGR:
     RESET = "\x1b[0m"
+
     BOLD = "\x1b[1m"
     DIM = "\x1b[2m"
     ITALIC = "\x1b[3m"
@@ -14,6 +15,15 @@ class SGR:
     BLINK = "\x1b[5m"
     REVERSE = "\x1b[7m"
     STRIKE = "\x1b[9m"
+
+    NOT_BOLD = "\x1b[22m"
+    NOT_DIM = "\x1b[22m"
+    NOT_ITALIC = "\x1b[23m"
+    NOT_UNDERLINE = "\x1b[24m"
+    NOT_BLINK = "\x1b[25m"
+    NOT_REVERSE = "\x1b[27m"
+    NOT_STRIKE = "\x1b[29m"
+
     DEFAULT_FG = "\x1b[39m"
     DEFAULT_BG = "\x1b[49m"
 
@@ -114,6 +124,15 @@ class Theme:
     blink: str = SGR.BLINK
     reverse: str = SGR.REVERSE
     strike: str = SGR.STRIKE
+    # Reverse styles.
+    not_bold: str = SGR.NOT_BOLD
+    not_dim: str = SGR.NOT_DIM
+    not_italic: str = SGR.NOT_ITALIC
+    not_underline: str = SGR.NOT_UNDERLINE
+    not_blink: str = SGR.NOT_BLINK
+    not_reverse: str = SGR.NOT_REVERSE
+    not_strike: str = SGR.NOT_STRIKE
+    # Defaults.
     fg: str = SGR.DEFAULT_FG
     bg: str = SGR.DEFAULT_BG
     # Standard colors.
@@ -159,48 +178,21 @@ class Theme:
     log_warning: str = SGR.LIGHT_YELLOW
     log_error: str = SGR.BOLD + SGR.LIGHT_RED
     log_critical: str = SGR.BOLD + SGR.LIGHT_RED + SGR.REVERSE
-    log_levels: dict[str, str] = field(init=False)
     # Console text.
     name: str = SGR.GREEN
     version: str = SGR.CYAN + SGR.BOLD
     error: str = SGR.RED + SGR.BOLD
     runtime: str = SGR.LIGHT_GREEN
 
-    def __post_init__(self):
-        self.log_levels = {
-            "DEBUG": self.log_debug,
-            "INFO": self.log_info,
-            "WARNING": self.log_warning,
-            "ERROR": self.log_error,
-            "CRITICAL": self.log_critical,
-        }
-
     @classmethod
     def no_colors(cls):
-        return cls(**{f.name: "" for f in fields(cls) if f.init})
-
-    def __format__(self, spec: str) -> str:
-        if spec in self.log_levels:
-            return f"{self.log_levels[spec]}{spec:<8}{self.reset}"
-        return self.style(spec, reset=True)
+        return cls(**{f.name: "" for f in fields(cls)})
 
     def style(self, text: str, reset: bool = True) -> str:
         """Style ``text`` with rich-like markup."""
         for f in fields(self):
-            if f.init:
-                text = text.replace(f"[{f.name}]", getattr(self, f.name))
+            text = text.replace(f"[{f.name}]", getattr(self, f.name))
         return text.replace("[/]", self.reset) + (self.reset if reset else "")
-
-    def print(self, text: str, reset: bool = True):
-        """Shortcut for ``print(Theme.style(text))``.
-
-        If ``reset``, ``Theme.reset`` will be appended to ``text``.
-        """
-        print(self.style(text, reset=reset))
-
-    def exit(self, text: str):
-        """Raise ``SystemExit`` with a styled message."""
-        raise SystemExit(get_theme(sys.stderr).style(text, reset=True))
 
 
 def get_theme(file=None) -> Theme:
