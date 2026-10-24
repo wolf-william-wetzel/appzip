@@ -49,4 +49,9 @@ class Metadata:
         return self.data[name]
 
     def __repr__(self):
-        return pformat(self.data, indent=2, expand=True, sort_dicts=False).replace("\n", "\n" + " " * 24)
+        return pformat(
+            self.data,
+            indent=2,
+            expand=True,
+            sort_dicts=False,
+        ).replace("\n", "\n" + " " * 24).replace("EntryPoint", "[magenta]EntryPoint[/]")

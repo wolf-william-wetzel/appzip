@@ -107,7 +107,51 @@ def can_colorize(file=None) -> bool:
 class Theme:
     reset: str = SGR.RESET
     # Standard styles.
+    bold: str = SGR.BOLD
     dim: str = SGR.DIM
+    italic: str = SGR.ITALIC
+    underline: str = SGR.UNDERLINE
+    blink: str = SGR.BLINK
+    reverse: str = SGR.REVERSE
+    strike: str = SGR.STRIKE
+    fg: str = SGR.DEFAULT_FG
+    bg: str = SGR.DEFAULT_BG
+    # Standard colors.
+    black: str = SGR.BLACK
+    red: str = SGR.RED
+    green: str = SGR.GREEN
+    yellow: str = SGR.YELLOW
+    blue: str = SGR.BLUE
+    magenta: str = SGR.MAGENTA
+    cyan: str = SGR.CYAN
+    l_gray: str = SGR.LIGHT_GRAY
+    # Bright colors.
+    gray: str = SGR.DARK_GRAY
+    l_red: str = SGR.LIGHT_RED
+    l_green: str = SGR.LIGHT_GREEN
+    l_yellow: str = SGR.LIGHT_YELLOW
+    l_blue: str = SGR.LIGHT_BLUE
+    l_magenta: str = SGR.LIGHT_MAGENTA
+    l_cyan: str = SGR.LIGHT_CYAN
+    white: str = SGR.WHITE
+    # Background colors.
+    black_bg: str = SGR.BG_BLACK
+    red_bg: str = SGR.BG_RED
+    green_bg: str = SGR.BG_GREEN
+    yellow_bg: str = SGR.BG_YELLOW
+    blue_bg: str = SGR.BG_BLUE
+    magenta_bg: str = SGR.BG_MAGENTA
+    cyan_bg: str = SGR.BG_CYAN
+    l_gray_bg: str = SGR.BG_LIGHT_GRAY
+    # Bright background colors.
+    gray_bg: str = SGR.BG_DARK_GRAY
+    l_red_bg: str = SGR.BG_LIGHT_RED
+    l_green_bg: str = SGR.BG_LIGHT_GREEN
+    l_yellow_bg: str = SGR.BG_LIGHT_YELLOW
+    l_blue_bg: str = SGR.BG_LIGHT_BLUE
+    l_magenta_bg: str = SGR.BG_LIGHT_MAGENTA
+    l_cyan_bg: str = SGR.BG_LIGHT_CYAN
+    white_bg: str = SGR.BG_WHITE
     # Logging.
     log_time: str = SGR.DIM + SGR.CYAN
     log_debug: str = SGR.GREEN
