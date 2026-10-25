@@ -202,6 +202,11 @@ class Theme:
     indent: str = SGR.GREEN + SGR.DIM
     path: str = SGR.MAGENTA
     filename: str = SGR.LIGHT_MAGENTA
+    notimpl: str = SGR.ITALIC + SGR.RED
+    dataclass: str = SGR.LIGHT_YELLOW + SGR.ITALIC
+    hint: str = SGR.CYAN
+    default: str = SGR.RESET
+    doc: str = SGR.DIM + SGR.ITALIC + SGR.GREEN
 
     @classmethod
     def no_colors(cls):

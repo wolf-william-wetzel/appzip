@@ -31,7 +31,8 @@ def fatal(message: str, code: int = 1):
 
 def main():
     log.debug("File: %s", PYZ_PATH)
-    log.debug("Interactive: %s", console.interactive)
+    log.debug("Terminal colors: %s", console.theme.reset != "")
+    log.debug("Terminal interactive: %s", console.interactive)
 
     # Load metadata.
     log.info("Loading metadata...")

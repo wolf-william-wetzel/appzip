@@ -22,23 +22,19 @@ class ThemeFormatter(logging.Formatter):
             defaults={"theme": self.theme},
         )
 
-    @staticmethod
-    def prepr(value) -> str:
-        return prepr(value).replace("\n", "\n" + " " * 24)
-
     def format(self, record) -> str:
         # Style the log level name.
         if (level := record.levelname) in self.log_level_styles:
             record.levelname = f"{self.log_level_styles[level]}{level:<8}{self.theme.reset}"
         # Format the message.
         if not isinstance(record.msg, str):
-            record.msg = self.prepr(record.msg)
+            record.msg = prepr(record.msg).replace("\n", "\n" + " " * 24)
         # Format the args.
         if record.args:
             if isinstance(record.args, tuple):
-                record.msg %= tuple(self.prepr(a) for a in record.args)
+                record.msg %= tuple(prepr(a) for a in record.args)
             else:
-                record.msg %= {k: self.prepr(v) for k, v in record.args.items()}
+                record.msg %= {k: prepr(v) for k, v in record.args.items()}
         record.args = None
         # Style the message.
         record.msg = self.theme.style(record.msg)
