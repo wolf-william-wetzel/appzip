@@ -1,7 +1,7 @@
 from dataclasses import is_dataclass, fields, MISSING
 from functools import singledispatch
 import datetime as dt
-from types import EllipsisType, NotImplementedType
+from types import EllipsisType, NotImplementedType, SimpleNamespace
 from pathlib import Path
 import inspect
 
@@ -54,6 +54,15 @@ def prepr(obj, indent: int = 0) -> str:
         )
     # Default to str.
     return str(obj)
+
+@prepr.register
+def _(obj: SimpleNamespace, indent: int = 0) -> str:
+    return _make_lines(
+        f"[name]{type(obj).__name__}[/][brace]([/]",
+        [f"[attr]{name}[/]={prepr(value, indent=indent + INDENT)}" for name, value in vars(obj).items()],
+        "[brace])[/]",
+        indent=indent,
+    )
 
 @prepr.register
 def _(obj: list, indent: int = 0) -> str:
