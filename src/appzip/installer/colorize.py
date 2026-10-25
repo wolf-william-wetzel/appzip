@@ -190,10 +190,18 @@ class Theme:
     string: str = SGR.GREEN
     number: str = SGR.CYAN + SGR.BOLD
     error: str = SGR.RED + SGR.BOLD
-    time: str = SGR.LIGHT_GREEN
-    true: str = SGR.ITALIC + SGR.GREEN + SGR.BOLD
-    false: str = SGR.ITALIC + SGR.RED + SGR.BOLD
-    none: str = SGR.ITALIC + SGR.MAGENTA + SGR.BOLD
+    time: str = SGR.LIGHT_GREEN + SGR.BOLD
+    true: str = SGR.LIGHT_GREEN + SGR.ITALIC
+    false: str = SGR.LIGHT_RED + SGR.ITALIC
+    none: str = SGR.MAGENTA + SGR.ITALIC
+    brace: str = SGR.BOLD
+    name: str = SGR.BOLD + SGR.MAGENTA
+    attr: str = SGR.YELLOW
+    bytes: str = SGR.LIGHT_GREEN
+    ellipsis: str = SGR.YELLOW
+    indent: str = SGR.GREEN + SGR.DIM
+    path: str = SGR.MAGENTA
+    filename: str = SGR.LIGHT_MAGENTA
 
     @classmethod
     def no_colors(cls):

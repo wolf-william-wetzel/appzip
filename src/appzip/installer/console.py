@@ -1,20 +1,8 @@
 import logging
 from contextlib import contextmanager
-from pprint import pformat
 
 from .colorize import get_theme, is_term, decolor
-
-
-def prepr(value, indent: int = 0) -> str:
-    if value is None:
-        return "[none]None[/]"
-    if isinstance(value, bool):
-        return f"[{'true' if value else 'false'}]{value}[/]"
-    if isinstance(value, str):
-        return f"[string]{value!r}[/]"
-    if isinstance(value, (int, float, complex)):
-        return f"[number]{value!r}[/]"
-    return pformat(value, indent=2, expand=True, sort_dicts=False).replace("\n", f"\n{' ' * indent}")
+from .pretty import prepr
 
 
 class ThemeFormatter(logging.Formatter):

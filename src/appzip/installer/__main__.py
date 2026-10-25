@@ -30,6 +30,7 @@ def fatal(message: str, code: int = 1):
 
 
 def main():
+    log.debug("File: %s", PYZ_PATH)
     log.debug("Interactive: %s", console.interactive)
 
     # Load metadata.
@@ -50,6 +51,6 @@ def main():
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
-    log.debug(f"Finished in [time]{runtime}")
-    console.print(f"[dim]Finished in [time]{runtime}")
-    console.print(f"Installed [l_green]{metadata.name}[/] [number]{metadata.version}[/]")
+    log.debug("Finished in %s", runtime)
+    console.print(f"[dim]Finished in", runtime)
+    console.print(f"Installed [time]{metadata.name}[/] [number]{metadata.version}[/]")
