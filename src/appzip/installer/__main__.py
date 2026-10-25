@@ -12,6 +12,7 @@ from .console import Console
 
 START_TIME = time.perf_counter_ns()
 PYZ_PATH = Path(__file__).parent.parent
+STATUS = "[blink][l_green]\u25cf[/] "
 
 console = Console(sys.stdout)
 
@@ -25,25 +26,27 @@ logging.basicConfig(
 def fatal(message: str, code: int = 1):
     """Exit due to fatal error."""
     log.critical(message)
-    console.exit(message, code)
+    console.exit(f"[error]{message}", code)
 
 
 def main():
-    # Opening message.
-    console.print("[dim]Running installer...")
     log.debug(f"Interactive: {console.interactive}")
 
     # Load metadata.
     log.info("Loading metadata...")
-    with ZipFile(PYZ_PATH) as zf:
-        metadata = Metadata.from_json(zf.read("metadata.json"))
+    with console.status(f"{STATUS}Loading metadata..."):
+        with ZipFile(PYZ_PATH) as zf:
+            metadata = Metadata.from_json(zf.read("metadata.json"))
     log.debug(metadata)
 
     # Verify proper python version.
-    log.debug("Checking python version...")
-    if metadata.minimum_python > sys.hexversion:
-        s = f"{metadata.minimum_python:0>8x}"
-        fatal(f"[error]Installer requires Python >={int(s[:2], 16)}.{int(s[2:4], 16)}, not {python_version()}")
+    log.info("Checking python version...")
+    with console.status(f"{STATUS}Checking python version..."):
+        py_hex_str = f"{metadata.minimum_python:0>8x}"
+        major, minor = int(py_hex_str[:2], 16), int(py_hex_str[2:4], 16)
+        if metadata.minimum_python > sys.hexversion:
+            fatal(f"Installer requires Python >={major}.{minor}, not {python_version()}")
+    log.debug(f"Python {python_version()} >= {major}.{minor}")
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)

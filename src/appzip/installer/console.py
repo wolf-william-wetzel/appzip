@@ -1,6 +1,7 @@
 import logging
+from contextlib import contextmanager
 
-from .colorize import get_theme, is_term
+from .colorize import get_theme, is_term, decolor
 
 
 class ThemeFormatter(logging.Formatter):
@@ -30,22 +31,77 @@ class ThemeFormatter(logging.Formatter):
         return super().format(record)
 
 
+class Live:
+    def __init__(self, console: Console, text: str = ""):
+        self.console = console
+        self.anti_text = self.text = ""
+        self.update(str(text))
+
+    def update(self, text: str):
+        if not self.console.interactive:
+            return
+        with self:
+            self.text = self.console.theme.style(str(text))
+            text_len = len(decolor(self.text))
+            self.anti_text = "".join(s * text_len for s in ("\b", " ", "\b"))
+
+    def show(self, text: str):
+        print(text, end="", flush=True, file=self.console.file)
+
+    def disp(self):
+        self.show(self.text)
+
+    def clear(self):
+        self.show(self.anti_text)
+
+    def end(self, transient: bool = True):
+        if transient:
+            self.clear()
+        else:
+            print(flush=True, file=self.console.file)
+
+    def __enter__(self):
+        if self.text:
+            self.clear()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disp()
+
+
 class Console:
     """Console object for easy terminal styles."""
-    def __init__(self, file=None):
+    def __init__(self, file=None, interactive: bool | None = None):
         """If ``file`` is ``None``, default to ``sys.stdout``."""
         self.file = file
         self.theme = get_theme(file)
-        self.interactive = is_term(file)
+        self.interactive = is_term(file) if interactive is None else interactive
+        self.live = Live(self)
+
+    def write(self, value):
+        with self.live:
+            return self.file.write(value)
+
+    def flush(self):
+        return self.file.flush()
+
+    @contextmanager
+    def status(self, text, transient: bool = True):
+        self.live.update(str(text))
+        try:
+            yield self.live
+        finally:
+            self.live.end(transient)
+            self.live.update("")
 
     def get_logging_handler(self):
-        handler = logging.StreamHandler(self.file)
+        handler = logging.StreamHandler(self)
         handler.setFormatter(ThemeFormatter(self.theme))
         return handler
 
-    def print(self, value, end: str = "\n", flush: bool = False):
+    def print(self, value, end: str = "\n"):
         """Prints ``value`` styled with rich-like markup."""
-        print(self.theme.style(str(value)), end=end, flush=flush, file=self.file)
+        with self.live:
+            print(self.theme.style(str(value)), end=end, file=self.file)
 
     def exit(self, message: str, code: int = 1):
         """Print a styled message, then raise ``SystemExit(code)``."""

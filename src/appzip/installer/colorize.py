@@ -198,6 +198,7 @@ class Theme:
 
     def style(self, text: str, reset: bool = True) -> str:
         """Style ``text`` with rich-like markup."""
+        if not text: return text
         for f in fields(self):
             text = text.replace(f"[{f.name}]", getattr(self, f.name))
         return text.replace("[/]", self.reset) + (self.reset if reset else "")
