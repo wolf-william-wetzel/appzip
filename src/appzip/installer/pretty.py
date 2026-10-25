@@ -42,10 +42,11 @@ def prepr(obj, indent: int = 0) -> str:
         for f in fields(obj):
             if not f.repr:
                 continue
-            middle.append(
-                f"[attr]{f.name}[/]="
-                f"{prepr(getattr(obj, f.name), indent=indent + INDENT)},"
-            )
+            if (value := getattr(obj, f.name)) == f.default:
+                continue
+            if f.default_factory is not MISSING and value == f.default_factory():
+                continue
+            middle.append(f"[attr]{f.name}[/]={prepr(value, indent=indent + INDENT)},")
         return _make_lines(
             f"[name]{type(obj).__name__}[/][brace]([/]",
             middle,
@@ -131,7 +132,7 @@ def _(obj: type, **kwargs) -> str:
                 continue
             if not kw and f.kw_only:
                 kw = True
-                middle.append("[brace]*[/],")
+                middle.append("[brace]*[/]")
             middle.append(f"[attr]{f.name}[/]: [hint]{f.type.__name__}[/]")
             if f.default is not MISSING:
                 middle[-1] += f" = [default]{prepr(f.default, indent=indent + INDENT)}[/]"
