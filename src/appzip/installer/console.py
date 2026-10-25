@@ -1,7 +1,20 @@
 import logging
 from contextlib import contextmanager
+from pprint import pformat
 
 from .colorize import get_theme, is_term, decolor
+
+
+def prepr(value, indent: int = 0) -> str:
+    if value is None:
+        return "[none]None[/]"
+    if isinstance(value, bool):
+        return f"[{'true' if value else 'false'}]{value}[/]"
+    if isinstance(value, str):
+        return f"[string]{value!r}[/]"
+    if isinstance(value, (int, float, complex)):
+        return f"[number]{value!r}[/]"
+    return pformat(value, indent=2, expand=True, sort_dicts=False).replace("\n", f"\n{' ' * indent}")
 
 
 class ThemeFormatter(logging.Formatter):
@@ -24,9 +37,19 @@ class ThemeFormatter(logging.Formatter):
     def format(self, record) -> str:
         # Style the log level name.
         if (level := record.levelname) in self.log_level_styles:
-            record.levelname = f"{self.log_level_styles[level]}{level}{self.theme.reset}"
+            record.levelname = f"{self.log_level_styles[level]}{level:<8}{self.theme.reset}"
+        # Format the message.
+        if not isinstance(record.msg, str):
+            record.msg = prepr(record.msg, 24)
+        # Format the args.
+        if record.args:
+            if isinstance(record.args, tuple):
+                record.msg %= tuple(prepr(a, 24) for a in record.args)
+            else:
+                record.msg %= {k: prepr(v, 24) for k, v in record.args.items()}
+        record.args = None
         # Style the message.
-        record.msg, record.args = self.theme.style(record.getMessage(), reset=True), None
+        record.msg = self.theme.style(record.msg)
         # Standard formatting.
         return super().format(record)
 
@@ -35,7 +58,7 @@ class Live:
     def __init__(self, console: Console, text: str = ""):
         self.console = console
         self.anti_text = self.text = ""
-        self.update(str(text))
+        self.update(text)
 
     def update(self, text: str):
         if not self.console.interactive:
@@ -86,7 +109,7 @@ class Console:
 
     @contextmanager
     def status(self, text, transient: bool = True):
-        self.live.update(str(text))
+        self.live.update(text)
         try:
             yield self.live
         finally:
@@ -98,10 +121,11 @@ class Console:
         handler.setFormatter(ThemeFormatter(self.theme))
         return handler
 
-    def print(self, value, end: str = "\n"):
-        """Prints ``value`` styled with rich-like markup."""
+    def print(self, *values, sep: str = " ", end: str = "\n"):
+        """Prints ``values`` styled with rich-like markup."""
+        value = sep.join(v if isinstance(v, str) else prepr(v) for v in values)
         with self.live:
-            print(self.theme.style(str(value)), end=end, file=self.file)
+            print(self.theme.style(value), end=end, file=self.file)
 
     def exit(self, message: str, code: int = 1):
         """Print a styled message, then raise ``SystemExit(code)``."""

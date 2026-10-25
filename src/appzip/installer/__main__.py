@@ -30,7 +30,7 @@ def fatal(message: str, code: int = 1):
 
 
 def main():
-    log.debug(f"Interactive: {console.interactive}")
+    log.debug("Interactive: %s", console.interactive)
 
     # Load metadata.
     log.info("Loading metadata...")
@@ -46,10 +46,10 @@ def main():
         major, minor = int(py_hex_str[:2], 16), int(py_hex_str[2:4], 16)
         if metadata.minimum_python > sys.hexversion:
             fatal(f"Installer requires Python >={major}.{minor}, not {python_version()}")
-    log.debug(f"Python {python_version()} >= {major}.{minor}")
+    log.debug(f"Python [string]{python_version()}[/] >= [string]{major}.{minor}[/]")
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
-    log.debug(f"Finished in [runtime]{runtime}")
-    console.print(f"[dim]Finished in [runtime]{runtime}")
-    console.print(f"Installed [name]{metadata.name}[/] [version]{metadata.version}[/]")
+    log.debug(f"Finished in [time]{runtime}")
+    console.print(f"[dim]Finished in [time]{runtime}")
+    console.print(f"Installed [l_green]{metadata.name}[/] [number]{metadata.version}[/]")

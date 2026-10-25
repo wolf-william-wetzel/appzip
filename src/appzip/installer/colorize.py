@@ -186,11 +186,14 @@ class Theme:
     log_warning: str = SGR.LIGHT_YELLOW
     log_error: str = SGR.BOLD + SGR.LIGHT_RED
     log_critical: str = SGR.BOLD + SGR.LIGHT_RED + SGR.REVERSE
-    # Console text.
-    name: str = SGR.GREEN
-    version: str = SGR.CYAN + SGR.BOLD
+    # Repr.
+    string: str = SGR.GREEN
+    number: str = SGR.CYAN + SGR.BOLD
     error: str = SGR.RED + SGR.BOLD
-    runtime: str = SGR.LIGHT_GREEN
+    time: str = SGR.LIGHT_GREEN
+    true: str = SGR.ITALIC + SGR.GREEN + SGR.BOLD
+    false: str = SGR.ITALIC + SGR.RED + SGR.BOLD
+    none: str = SGR.ITALIC + SGR.MAGENTA + SGR.BOLD
 
     @classmethod
     def no_colors(cls):
