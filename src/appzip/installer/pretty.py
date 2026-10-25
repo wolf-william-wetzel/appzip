@@ -7,43 +7,49 @@ from pathlib import Path
 INDENT = 2
 
 
+def guides(indent: int) -> str:
+    return f"[indent]\u2502[/]{' ' * (INDENT - 1)}" * (indent // INDENT)
+
+
 @singledispatch
 def prepr(obj, indent: int = 0) -> str:
     if is_dataclass(obj) and not isinstance(obj, type):
-        spaces, level = " " * indent, " " * INDENT
         header = f"[name]{obj.__class__.__name__}[/][brace]([/]"
         middle = []
         for f in fields(obj):
             middle.append(
-                f"{spaces}{level}[attr]{f.name}[/]={prepr(getattr(obj, f.name), indent=indent + INDENT)},"
+                f"{guides(indent + INDENT)}"
+                f"[attr]{f.name}[/]="
+                f"{prepr(getattr(obj, f.name), indent=indent + INDENT)},"
             )
-        footer = f"{spaces}[brace])[/]"
+        footer = f"{guides(indent)}[brace])[/]"
         return "\n".join((header, *middle, footer))
     return str(obj)
 
 @prepr.register
 def _(obj: list | tuple, indent: int = 0) -> str:
-    spaces, level = " " * indent, " " * INDENT
     braces = "[]" if isinstance(obj, list) else "()"
     header = f"[brace]{braces[0]}[/]"
     middle = []
     for item in obj:
         middle.append(
-            f"{spaces}{level}{prepr(item, indent=indent + INDENT)},"
+            f"{guides(indent + INDENT)}"
+            f"{prepr(item, indent=indent + INDENT)},"
         )
-    footer = f"{spaces}[brace]{braces[1]}[/]"
+    footer = f"{guides(indent)}[brace]{braces[1]}[/]"
     return "\n".join((header, *middle, footer))
 
 @prepr.register
 def _(obj: dict, indent: int = 0) -> str:
-    spaces, level = " " * indent, " " * INDENT
     header = f"[brace]{{[/]"
     middle = []
     for key, item in obj.items():
         middle.append(
-            f"{spaces}{level}{prepr(key, indent=indent + INDENT)}: {prepr(item, indent=indent + INDENT * 2)},"
+            f"{guides(indent + INDENT)}"
+            f"{prepr(key, indent=indent + INDENT)}: "
+            f"{prepr(item, indent=indent + INDENT * 2)},"
         )
-    footer = f"{spaces}[brace]}}[/]"
+    footer = f"{guides(indent)}[brace]}}[/]"
     return "\n".join((header, *middle, footer))
 
 @prepr.register
