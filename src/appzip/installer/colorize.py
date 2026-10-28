@@ -185,7 +185,7 @@ class Theme:
     log_info: str = SGR.BLUE
     log_warning: str = SGR.LIGHT_YELLOW
     log_error: str = SGR.BOLD + SGR.LIGHT_RED
-    log_critical: str = SGR.BOLD + SGR.LIGHT_RED + SGR.REVERSE
+    log_critical: str = SGR.BOLD + SGR.WHITE + SGR.BG_RED
     # Repr.
     string: str = SGR.GREEN
     number: str = SGR.CYAN + SGR.BOLD
@@ -207,6 +207,8 @@ class Theme:
     hint: str = SGR.CYAN
     default: str = SGR.RESET
     doc: str = SGR.DIM + SGR.ITALIC + SGR.GREEN
+    app: str = SGR.LIGHT_CYAN
+    version: str = SGR.BOLD + SGR.CYAN
 
     @classmethod
     def no_colors(cls):

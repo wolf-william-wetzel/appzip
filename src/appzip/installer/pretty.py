@@ -4,6 +4,7 @@ import datetime as dt
 from types import EllipsisType, NotImplementedType, SimpleNamespace
 from pathlib import Path
 import inspect
+import os
 
 INDENT = 2
 
@@ -152,8 +153,8 @@ def _(obj: NotImplementedType, **_) -> str:
 @prepr.register
 def _(obj: Path, **_) -> str:
     if obj.is_dir():
-        return f"[path]{obj.as_posix()}/[/]"
-    return f"[path]{obj.parent.as_posix()}/[/][filename]{obj.name}[/]"
+        return f"[path]{obj}{os.path.sep}[/]"
+    return f"[path]{obj.parent}{os.path.sep}[/][filename]{obj.name}[/]"
 
 @prepr.register
 def _(obj: dt.timedelta | dt.date | dt.time | dt.datetime, **_) -> str:

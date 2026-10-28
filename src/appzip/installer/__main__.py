@@ -9,10 +9,10 @@ from zipfile import ZipFile
 
 from .metadata import Metadata
 from .console import Console
+from .folder import get_install_dir
 
 START_TIME = time.perf_counter_ns()
 PYZ_PATH = Path(__file__).parent.parent
-STATUS = "[blink][l_green]\u25cf[/] "
 
 console = Console(sys.stdout)
 
@@ -23,12 +23,6 @@ logging.basicConfig(
 )
 
 
-def fatal(message: str, code: int = 1):
-    """Exit due to fatal error."""
-    log.critical(message)
-    console.exit(f"[error]{message}", code)
-
-
 def main():
     log.debug("File: %s", PYZ_PATH)
     log.debug("Terminal colors: %s", console.theme.reset != "")
@@ -36,22 +30,45 @@ def main():
 
     # Load metadata.
     log.info("Loading metadata...")
-    with console.status(f"{STATUS}Loading metadata..."):
+    with console.status("Loading metadata..."):
         with ZipFile(PYZ_PATH) as zf:
-            metadata = Metadata.from_json(zf.read("metadata.json"))
-    log.debug(metadata)
+            md = Metadata.from_json(zf.read("metadata.json"))
+    log.debug(md)
 
     # Verify proper python version.
     log.info("Checking python version...")
-    with console.status(f"{STATUS}Checking python version..."):
-        py_hex_str = f"{metadata.minimum_python:0>8x}"
+    with console.status("Checking python version..."):
+        py_hex_str = f"{md.minimum_python:0>8x}"
         major, minor = int(py_hex_str[:2], 16), int(py_hex_str[2:4], 16)
-        if metadata.minimum_python > sys.hexversion:
-            fatal(f"Installer requires Python >={major}.{minor}, not {python_version()}")
+        if md.minimum_python > sys.hexversion:
+            console.exit(f"[error]Installer requires Python >={major}.{minor}, not {python_version()}")
     log.debug(f"Python [string]{python_version()}[/] >= [string]{major}.{minor}[/]")
+
+    # Get the installation directory.
+    install_dir = get_install_dir() / md.folder_name
+    try:
+        install_dir.mkdir(parents=True)
+        install_dir = install_dir.resolve(strict=True)
+    except FileExistsError:
+        # The path exists and is a file, not a folder.
+        if not install_dir.is_dir():
+            console.exit("Installation path is not a directory:", install_dir)
+        # The path exists, so this version of the app was installed previously.
+        log.warning(f"{md.app_name} is already installed: %s", install_dir)
+        if not console.confirm("Overwrite previous installation?", False):
+            console.exit("Exiting installer...", code=0)
+        # Overwrite the previous installation.
+        log.warning("Overwriting previous installation.")
+    except OSError:
+        console.exit("Installation path contains symlink loops:", install_dir)
+
+    # Install the app.
+    log.info(f"Installing {md.app_name} to %s", install_dir)  # noqa
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
     log.debug("Finished in %s", runtime)
     console.print(f"[dim]Finished in", runtime)
-    console.print(f"Installed [time]{metadata.name}[/] [number]{metadata.version}[/]")
+    console.print(f"Installed {md.app_name} to "
+                  f"[yellow]{console.link(str(install_dir.parent) + os.path.sep, install_dir.parent)}[/]"
+                  f"[l_yellow]{console.link(install_dir.name + os.path.sep, install_dir)}[/]")

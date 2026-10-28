@@ -28,6 +28,13 @@ class Metadata:
     minimum_python: int
     dependencies: list[str]
     entry_points: list[EntryPoint]
+    folder_name: str = ""
+    app_name: str = ""
+
+    def __post_init__(self):
+        self.folder_name = f"{self.name}_{self.version}" if self.version else self.name
+        app_name = f"[app]{self.name}[/]"
+        self.app_name = f"{app_name} [version]{self.version}[/]" if self.version else app_name
 
     @staticmethod
     def _json_object_hook(obj: dict):

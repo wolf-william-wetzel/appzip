@@ -1,8 +1,14 @@
 import logging
 from contextlib import contextmanager
+import sys
 
 from .colorize import get_theme, is_term, decolor
 from .pretty import prepr
+
+log = logging.getLogger(__name__)
+
+CONFIRM_PROMPT = " [bold][[l_green]y[fg]/[l_red]n[fg]][/] "
+STATUS_SPINNER = "[blink][l_green]\u25cf[/] "
 
 
 class ThemeFormatter(logging.Formatter):
@@ -88,6 +94,11 @@ class Console:
         self.interactive = is_term(file) if interactive is None else interactive
         self.live = Live(self)
 
+    def link(self, text, link: str | None = None):
+        if not self.interactive:
+            return text
+        return f"\x1b]8;;{text if link is None else link}\x1b\\{text}\x1b]8;;\x1b\\"
+
     def write(self, value):
         with self.live:
             return self.file.write(value)
@@ -97,7 +108,7 @@ class Console:
 
     @contextmanager
     def status(self, text, transient: bool = True):
-        self.live.update(text)
+        self.live.update(STATUS_SPINNER + text)
         try:
             yield self.live
         finally:
@@ -115,7 +126,19 @@ class Console:
         with self.live:
             print(self.theme.style(value), end=end, file=self.file)
 
-    def exit(self, message: str, code: int = 1):
-        """Print a styled message, then raise ``SystemExit(code)``."""
-        self.print(message)
+    def input(self, prompt: str, default: str = "") -> str:
+        if not self.interactive:
+            return default
+        self.print(prompt, end="")
+        return input()
+
+    def confirm(self, prompt: str, default: bool = False) -> bool:
+        return self.input(prompt + CONFIRM_PROMPT, "y" if default else "n").lower() == "y"
+
+    def exit(self, *messages, code: int = 1, exc: bool | None = None):
+        """Log and print a styled message, then raise ``SystemExit(code)``."""
+        if code:
+            pass_exc = sys.exc_info()[0] is not None if exc is None else exc
+            log.critical(f"[error]Exiting with code {code}", exc_info=pass_exc)
+        self.print(*messages)
         raise SystemExit(code)
