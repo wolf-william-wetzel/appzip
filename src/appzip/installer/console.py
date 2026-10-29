@@ -1,13 +1,19 @@
 import logging
 from contextlib import contextmanager
 import sys
+from pathlib import Path
+try:
+    import tkinter.filedialog as fd
+except ImportError:
+    fd = None
 
 from .colorize import get_theme, is_term, decolor
 from .pretty import prepr
 
 log = logging.getLogger(__name__)
 
-CONFIRM_PROMPT = " [bold][[l_green]y[fg]/[l_red]n[fg]][/] "
+CONFIRM_YES = " [bold][[l_green]Y[fg]/[l_red]n[fg]][/] "
+CONFIRM_NO = " [bold][[l_green]y[fg]/[l_red]N[fg]][/] "
 STATUS_SPINNER = "[blink][l_green]\u25cf[/] "
 
 
@@ -130,10 +136,10 @@ class Console:
         if not self.interactive:
             return default
         self.print(prompt, end="")
-        return input()
+        return input() or default
 
     def confirm(self, prompt: str, default: bool = False) -> bool:
-        return self.input(prompt + CONFIRM_PROMPT, "y" if default else "n").lower() == "y"
+        return self.input(prompt + (CONFIRM_YES if default else CONFIRM_NO), "ny"[default]).lower() == "y"
 
     def exit(self, *messages, code: int = 1, exc: bool | None = None):
         """Log and print a styled message, then raise ``SystemExit(code)``."""
@@ -142,3 +148,10 @@ class Console:
             log.critical(f"[error]Exiting with code {code}", exc_info=pass_exc)
         self.print(*messages)
         raise SystemExit(code)
+
+    def ask_folder(self, message: str, default: Path) -> Path | None:
+        """If not interactive, default is returned. Otherwise, None means cancel."""
+        if not self.interactive:
+            return default
+        path = self.input(message) if fd is None else fd.askdirectory(title=message, initialdir=default)
+        return Path(path) if path else None

@@ -13,7 +13,7 @@ EXE = ["uv", "run"]
 INSTALLER_PATH = "testproject/dist/testapp_1.2.3_installer.pyz"
 PACK_COMMAND = [*EXE, "appzip", "testproject"]
 INSTALLER_HELP_COMMAND = [*EXE, INSTALLER_PATH, "-h"]
-INSTALL_COMMAND = [*EXE, INSTALLER_PATH, "-f"]
+INSTALL_COMMAND = [*EXE, INSTALLER_PATH, "-fc"]
 COMMANDS = {
     "pack": [PACK_COMMAND],
     "install": [PACK_COMMAND, INSTALLER_HELP_COMMAND, INSTALL_COMMAND],

@@ -209,6 +209,7 @@ class Theme:
     doc: str = SGR.DIM + SGR.ITALIC + SGR.GREEN
     app: str = SGR.LIGHT_CYAN
     version: str = SGR.BOLD + SGR.CYAN
+    link: str = SGR.LIGHT_BLUE
 
     @classmethod
     def no_colors(cls):
