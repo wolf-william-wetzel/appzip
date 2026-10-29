@@ -10,12 +10,14 @@ KWARGS = {
 }
 # The commands to be run.
 EXE = ["uv", "run"]
+INSTALLER_PATH = "testproject/dist/testapp_1.2.3_installer.pyz"
 PACK_COMMAND = [*EXE, "appzip", "testproject"]
-INSTALL_COMMAND = [*EXE, "testproject/dist/testapp_1.2.3_installer.pyz"]
+INSTALLER_HELP_COMMAND = [*EXE, INSTALLER_PATH, "-h"]
+INSTALL_COMMAND = [*EXE, INSTALLER_PATH, "-f"]
 COMMANDS = {
     "pack": [PACK_COMMAND],
-    "install": [PACK_COMMAND, INSTALL_COMMAND],
-    "reinstall": [INSTALL_COMMAND],
+    "install": [PACK_COMMAND, INSTALLER_HELP_COMMAND, INSTALL_COMMAND],
+    "reinstall": [INSTALLER_HELP_COMMAND, INSTALL_COMMAND],
 }
 DEFAULT = "pack"
 
