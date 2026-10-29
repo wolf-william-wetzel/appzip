@@ -6,6 +6,7 @@ import time
 import datetime as dt
 from pathlib import Path
 from zipfile import ZipFile
+from shutil import rmtree
 
 from .metadata import Metadata
 from .console import Console
@@ -58,12 +59,15 @@ def main():
         if not console.confirm("Overwrite previous installation?", False):
             console.exit("Exiting installer...", code=0)
         # Overwrite the previous installation.
-        log.warning("Overwriting previous installation.")
+        log.warning(f"Overwriting previous installation of {md.app_name}")
+        errors: list[tuple[str, BaseException]] = []
+        rmtree(install_dir, onexc=lambda _, p, e: errors.append((p, e)))
+        if errors:
+            console.exit("\n".join(f"{p}: {e}" for p, e in errors), exc=False)
+        install_dir.mkdir(parents=True)
     except OSError:
         console.exit("Installation path contains symlink loops:", install_dir)
-
-    # Install the app.
-    log.info(f"Installing {md.app_name} to %s", install_dir)  # noqa
+    log.info(f"Installing {md.app_name} to %s", install_dir)
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
