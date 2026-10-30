@@ -8,6 +8,7 @@ from pathlib import Path
 from zipfile import ZipFile
 from shutil import rmtree
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
+import atexit
 
 from .metadata import Metadata
 from .console import Console
@@ -17,6 +18,7 @@ START_TIME = time.perf_counter_ns()
 PYZ_PATH = Path(__file__).parent.parent
 
 console = Console(sys.stdout)
+atexit.register(console.progress)
 
 log = logging.getLogger()
 logging.basicConfig(
@@ -60,6 +62,7 @@ parser.add_argument("path", type=Path, nargs="?", default=get_install_dir(),
 
 
 def main():
+    console.progress(3)
     args = parser.parse_args()
     args.path = args.path.expanduser().resolve()
     log.debug(args)

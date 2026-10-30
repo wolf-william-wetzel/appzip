@@ -105,6 +105,10 @@ class Console:
             return text
         return f"\x1b]8;;{text if link is None else link}\x1b\\{text}\x1b]8;;\x1b\\"
 
+    def progress(self, state: int = 0, percent: int = 0):
+        if self.interactive:
+            self.print(f"\x1b]9;4;{state};{percent}\x1b\\", end="")
+
     def write(self, value):
         with self.live:
             return self.file.write(value)

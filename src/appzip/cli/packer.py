@@ -7,6 +7,7 @@ import zipapp
 import datetime as dt
 import sys
 from functools import partial
+import atexit
 
 import msgspec
 from packaging.requirements import Requirement
@@ -153,10 +154,18 @@ def copy_node(src_dir: Path, dest_dir: Path, src_node: Path):
     log.debug(f"Copied {node_str}")
 
 
+def term_progress(console: Console, state: int = 0, number: int = 0):
+    if console.is_interactive:
+        console.out(f"\x1b]9;4;{state};{number}\x1b\\", end="")
+
+
 def pack(cfg: Config, console: Console | None = None):
     """Pack the project."""
     if console is None:
         console = Console(quiet=True)
+    else:
+        term_progress(console, 3)
+        atexit.register(term_progress, console)
 
     # Log config details.
     if cfg.path.is_file():
