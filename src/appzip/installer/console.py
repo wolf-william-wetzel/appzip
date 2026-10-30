@@ -154,4 +154,4 @@ class Console:
         if not self.interactive:
             return default
         path = self.input(message) if fd is None else fd.askdirectory(title=message, initialdir=default)
-        return Path(path) if path else None
+        return Path(path).expanduser().resolve() if path else None

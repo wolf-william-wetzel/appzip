@@ -61,6 +61,7 @@ parser.add_argument("path", type=Path, nargs="?", default=get_install_dir(),
 
 def main():
     args = parser.parse_args()
+    args.path = args.path.expanduser().resolve()
     log.debug(args)
     log.debug("File: %s", PYZ_PATH)
     log.debug("Terminal colors: %s", console.theme.reset != "")
