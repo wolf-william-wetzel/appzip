@@ -9,6 +9,8 @@ from zipfile import ZipFile
 from shutil import rmtree
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 import atexit
+import venv
+import subprocess
 
 from .metadata import Metadata
 from .console import Console
@@ -16,13 +18,14 @@ from .folder import get_install_dir
 
 START_TIME = time.perf_counter_ns()
 PYZ_PATH = Path(__file__).parent.parent
+DEBUG = bool(os.environ.get("DEBUG"))
 
 console = Console(sys.stdout)
 atexit.register(console.progress)
 
 log = logging.getLogger()
 logging.basicConfig(
-    level=logging.DEBUG if os.environ.get("DEBUG") else logging.WARNING,
+    level=logging.DEBUG if DEBUG else logging.WARNING,
     handlers=[console.get_logging_handler()],
 )
 
@@ -74,6 +77,7 @@ def main():
     log.info("Loading metadata...")
     with console.status("Loading metadata..."):
         with ZipFile(PYZ_PATH) as zf:
+            log.debug(zf.namelist())
             md = Metadata.from_json(zf.read("metadata.json"))
     log.debug(md)
 
@@ -117,6 +121,47 @@ def main():
     except OSError:
         console.exit("Installation path contains symlink loops:", install_dir)
     log.info(f"Installing {md.app_name} to %s", install_dir)
+
+    # Install the app.
+    with console.status("Installing...") as live:
+        log.info(f"Extracting {md.app_name} from %s", PYZ_PATH)
+        with ZipFile(PYZ_PATH) as zf:
+            zf.extractall(path=install_dir, members=[n for n in zf.namelist() if n.startswith("app/")])
+
+        # Install dependencies.
+        if md.dependencies:
+            log.info("Installing dependencies...")
+            venv_dir = install_dir / "app" / ".venv"
+            log.debug(f"Creating virtual environment at %s", venv_dir)
+            venv.create(
+                venv_dir,
+                symlinks=sys.platform != "win32",
+                with_pip=True,
+                upgrade_deps=True,
+            )
+
+            if (venv_dir / "bin").exists():
+                venv_py = venv_dir / "bin" / "python"
+            elif (venv_dir / "Scripts").exists():
+                venv_py = venv_dir / "Scripts" / "python.exe"
+            else:
+                console.exit(f"[error]No python executable found inside [path]{venv_dir}{os.path.sep}")
+            log.debug("Virtual environment python: %s", venv_py)
+
+            log.debug("Installing dependencies: %s", md.dependencies)
+            if DEBUG:
+                live.update("")  # Clear live before subprocess output ruins it.
+            subprocess.check_call(
+                [str(venv_py), "-m", "pip", "install", *md.dependencies],
+                stdout=None if DEBUG else subprocess.DEVNULL,
+            )
+        else:
+            log.debug("No dependencies to install.")
+
+    # Continue installation.
+    with console.status("Finishing up..."):
+        # Create entry points.
+        log.info("Creating entry points...")
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
