@@ -4,14 +4,23 @@ import datetime as dt
 from types import EllipsisType, NotImplementedType, SimpleNamespace
 from argparse import Namespace
 from pathlib import Path
-import inspect
 import os
+import zipfile
+from collections import Counter
 
 INDENT = 2
 
 
+class Char:
+    INDENT = "[indent]\u2502[/]"
+    TREE_TRUNK = "[magenta][dim]\u2502[/]"
+    TREE_BRANCH = "[magenta][dim]\u251c[/]"
+    TREE_LAST = "[magenta][dim]\u2514[/]"
+    TREE_LEAF = "[magenta][dim]\u2500[/]"
+
+
 def _make_indent(indent: int) -> str:
-    return f"[indent]\u2502[/]{' ' * (INDENT - 1)}" * (indent // INDENT)
+    return f"{Char.INDENT}{' ' * (INDENT - 1)}" * (indent // INDENT)
 
 
 def _make_lines(header: str, middle: list[str], footer: str | None = None, **kwargs) -> str:
@@ -24,39 +33,88 @@ def _make_lines(header: str, middle: list[str], footer: str | None = None, **kwa
     return "\n".join((header, *lines))
 
 
-def _format_doc(doc: str) -> list[str]:
-    doc_split = 80
-    lines: list[str] = []
-    for line in doc.splitlines():
-        if len(line) < doc_split:
-            lines.append(line)
+def _prepr_dataclass(obj, **kwargs) -> str:
+    indent = kwargs.get("indent", 0)
+    middle = []
+    for f in fields(obj):
+        if not f.init:
             continue
-        lines.append(line[:doc_split])
-        lines.append(line[doc_split:])
-    return [f"[doc]{line}[/]" for line in ['"""', *lines, '"""']]
+        if (value := getattr(obj, f.name)) == f.default:
+            continue
+        if f.default_factory is not MISSING and value == f.default_factory():
+            continue
+        middle.append(f"[attr]{f.name}[/]={prepr(value, indent=indent + INDENT)},")
+    return _make_lines(
+        f"[name]{type(obj).__name__}[/][brace]([/]",
+        middle,
+        "[brace])[/]",
+        indent=indent,
+    )
+
+
+def _format_bytes(number: int) -> str:
+    for limit, unit in zip((1<<p for p in range(40, 0, -10)), "TGMK"):
+        if abs(number) >= limit:
+            return f"{number / limit:,.2f} {unit}B"
+    return f"{number} B"
+
+
+def _make_zipinfo_name(obj: zipfile.ZipInfo, **kwargs) -> str:
+    size_str = f"{_format_bytes(kwargs.get("sizes", Counter())[obj.filename])}"
+    time_str = "{0}-{1}-{2} {3:0>2}:{4:0>2}:{5:0>2}".format(*obj.date_time)
+    name = obj.filename.removesuffix("/").rpartition("/")[2]
+    style = "[yellow]"
+    if obj.is_dir():
+        name += "/"
+        style = "[l_magenta]"
+    elif name.endswith(".py") or name.endswith(".pyw"):
+        style = "[l_blue]"
+    if name.startswith("__"):
+        style += "[italic]"
+    return f"{style}{name}[/] [dim][number]{size_str}[/] [dim][l_green]{time_str}[/]"
+
+
+def _prepr_zipdir(header: str, parent: Path, **kwargs) -> str:
+    indent: str = kwargs.get("indent", "")
+    middle = []
+    children = [i for i in kwargs.get("infolist", []) if Path(i.filename).parent == parent]
+    for i, info in enumerate(children):
+        last = i == len(children) - 1
+        pre_string = indent + (Char.TREE_BRANCH, Char.TREE_LAST)[last] + Char.TREE_LEAF
+        kws = kwargs | {"indent": indent + (Char.TREE_TRUNK + " ", "  ")[last]}
+        middle.append(f"{pre_string}{prepr(info, **kws)}")
+    return "\n".join((header, *middle))
+
+
+def _calculate_zipfile_sizes(zf: zipfile.ZipFile) -> Counter[str]:
+    sizes = Counter()
+    for info in zf.infolist():
+        sizes[info.filename] += info.file_size
+        sizes += {p.as_posix() + "/": info.file_size for p in Path(info.filename).parents}
+    return sizes
 
 
 @singledispatch
-def prepr(obj, indent: int = 0) -> str:
+def prepr(obj, **kwargs) -> str:
     # Dataclass instance.
     if is_dataclass(obj):
-        middle = []
-        for f in fields(obj):
-            if not f.repr:
-                continue
-            if (value := getattr(obj, f.name)) == f.default:
-                continue
-            if f.default_factory is not MISSING and value == f.default_factory():
-                continue
-            middle.append(f"[attr]{f.name}[/]={prepr(value, indent=indent + INDENT)},")
-        return _make_lines(
-            f"[name]{type(obj).__name__}[/][brace]([/]",
-            middle,
-            "[brace])[/]",
-            indent=indent,
-        )
+        return _prepr_dataclass(obj, **kwargs)
     # Default to str.
     return str(obj)
+
+@prepr.register
+def _(obj: zipfile.ZipFile, **_) -> str:
+    sizes = _calculate_zipfile_sizes(obj)
+    name = (obj.filename or "[error]Unnamed Archive").rpartition(os.path.sep)[2]
+    header = f"[name]{name} [number][dim]{_format_bytes(sizes["./"])}[/]"
+    return _prepr_zipdir(header, Path(), infolist=obj.infolist(), sizes=sizes)
+
+@prepr.register
+def _(obj: zipfile.ZipInfo, **kwargs) -> str:
+    name = _make_zipinfo_name(obj, **kwargs)
+    if obj.is_dir():
+        return _prepr_zipdir(name, Path(obj.filename), **kwargs)
+    return name
 
 @prepr.register
 def _(obj: list, indent: int = 0) -> str:
@@ -120,27 +178,7 @@ def _(obj: str, **_) -> str:
     return f"[string]{obj!r}[/]"
 
 @prepr.register
-def _(obj: type, **kwargs) -> str:
-    indent = kwargs.get("indent", 0)
-    # Dataclass class.
-    if is_dataclass(obj):
-        header = f"[dataclass]@dataclass[/] [name]{obj.__name__}[/]:"
-        middle = []
-        if doc := inspect.getdoc(obj):
-            middle.extend(_format_doc(doc))
-        kw = False
-        for f in fields(obj):  # noqa
-            if not f.repr:
-                continue
-            if not kw and f.kw_only:
-                kw = True
-                middle.append("[brace]*[/]")
-            middle.append(f"[attr]{f.name}[/]: [hint]{f.type.__name__}[/]")
-            if f.default is not MISSING:
-                middle[-1] += f" = [default]{prepr(f.default, indent=indent + INDENT)}[/]"
-            if f.default_factory is not MISSING:
-                middle[-1] += f" = [default]{prepr(f.default_factory, indent=indent + INDENT)}[/]"
-        return _make_lines(header, middle, None, indent=indent)
+def _(obj: type, **_) -> str:
     return f"[name]{obj.__name__}[/]"
 
 @prepr.register
@@ -152,8 +190,8 @@ def _(obj: NotImplementedType, **_) -> str:
     return f"[notimpl]{obj}[/]"
 
 @prepr.register
-def _(obj: Path, **_) -> str:
-    if obj.is_dir():
+def _(obj: Path, **kwargs) -> str:
+    if obj.is_dir() or kwargs.get("force_dir"):
         return f"[path]{obj}{os.path.sep}[/]"
     return f"[path]{obj.parent}{os.path.sep}[/][filename]{obj.name}[/]"
 

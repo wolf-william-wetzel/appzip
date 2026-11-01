@@ -77,7 +77,7 @@ def main():
     log.info("Loading metadata...")
     with console.status("Loading metadata..."):
         with ZipFile(PYZ_PATH) as zf:
-            log.debug(zf.namelist())
+            log.debug(zf)
             md = Metadata.from_json(zf.read("metadata.json"))
     log.debug(md)
 
@@ -148,7 +148,7 @@ def main():
                 console.exit(f"[error]No python executable found inside [path]{venv_dir}{os.path.sep}")
             log.debug("Virtual environment python: %s", venv_py)
 
-            log.debug("Installing dependencies: %s", md.dependencies)
+            log.debug(md.dependencies)
             if DEBUG:
                 live.update("")  # Clear live before subprocess output ruins it.
             subprocess.check_call(
