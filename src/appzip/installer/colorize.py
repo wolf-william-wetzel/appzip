@@ -1,6 +1,6 @@
-import os
-import sys
 from dataclasses import dataclass, fields
+
+from .utils import can_colorize
 
 
 class SGR:
@@ -62,63 +62,17 @@ class SGR:
     BG_WHITE = "\x1b[107m"
 
 
+SGR_CODES = set()
+for attr, code in vars(SGR).items():
+    if not attr.startswith("__"):
+        SGR_CODES.add(code)
+
+
 def decolor(text: str) -> str:
     """Remove ANSI codes from a string."""
-    for attr, code in vars(SGR).items():
-        if not attr.startswith("__"):
-            text.replace(code, "")
+    for sgr_code in SGR_CODES:
+        text.replace(sgr_code, "")
     return text
-
-
-def _safe_getenv(k: str, fallback: str | None = None) -> str | None:
-    """Copied from the Python 3.15 stdlib with some modifications."""
-    try:
-        return os.environ.get(k, fallback)
-    except Exception:  # noqa
-        return fallback
-
-
-def is_term(file=None) -> bool:
-    """Copied from the Python 3.15 stdlib with some modifications."""
-    if file is None:
-        file = sys.stdout
-
-    if _safe_getenv("TERM") in ("dumb", "unknown"):
-        return False
-
-    if not hasattr(file, "fileno"):
-        return False
-
-    try:
-        return os.isatty(file.fileno())
-    except OSError:
-        try:
-            return hasattr(file, "isatty") and file.isatty()
-        except ValueError:
-            return False
-
-
-def can_colorize(file=None) -> bool:
-    """Copied from the Python 3.15 stdlib with some modifications."""
-    if not sys.flags.ignore_environment:
-        if _safe_getenv("PYTHON_COLORS") == "0":
-            return False
-        if _safe_getenv("PYTHON_COLORS") == "1":
-            return True
-    if _safe_getenv("NO_COLOR"):
-        return False
-    if _safe_getenv("FORCE_COLOR"):
-        return True
-
-    if sys.platform == "win32":
-        try:
-            import nt  # noqa
-            if not nt._supports_virtual_terminal():  # noqa
-                return False
-        except (ImportError, AttributeError):
-            return False
-
-    return is_term(file)
 
 
 @dataclass

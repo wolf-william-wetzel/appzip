@@ -2,13 +2,15 @@ import logging
 from contextlib import contextmanager
 import sys
 from pathlib import Path
+import atexit
 try:
     import tkinter.filedialog as fd
 except ImportError:
     fd = None
 
-from .colorize import get_theme, is_term, decolor
+from .colorize import get_theme, decolor
 from .pretty import prepr
+from .utils import can_interact
 
 log = logging.getLogger(__name__)
 
@@ -97,8 +99,9 @@ class Console:
         """If ``file`` is ``None``, default to ``sys.stdout``."""
         self.file = file
         self.theme = get_theme(file)
-        self.interactive = is_term(file) if interactive is None else interactive
+        self.interactive = can_interact(file) if interactive is None else interactive
         self.live = Live(self)
+        atexit.register(self.progress)
 
     def link(self, text, link: str | None = None):
         if not self.interactive:
