@@ -30,18 +30,18 @@ logging.basicConfig(
 HELP = console.theme.style("""
 Install the bundled application.
 
-[bold][blue]examples:[/]
+[b][blue]examples:[/]
 Install at default location:
 [magenta]%(prog)s[/]
 
 Install at custom location:
-[magenta]%(prog)s [bold][green]path/to/dir/[/]
+[magenta]%(prog)s [b][green]path/to/dir/[/]
 
 Install, deleting and reinstalling if already installed:
-[magenta]%(prog)s [bold][cyan]--reinstall[/]
+[magenta]%(prog)s [b][cyan]--reinstall[/]
 
 All options:
-[magenta]%(prog)s [bold][green]path/to/dir/ -r[/]\
+[magenta]%(prog)s [b][green]path/to/dir/ -r[/]\
 """)
 REPO_LINK = "https://github.com/wolf-william-wetzel/appzip"
 EPILOG = console.theme.style(f"""
@@ -161,7 +161,7 @@ def main():
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
     log.debug("Finished in %s", runtime)
-    console.print(f"[dim]Finished in", runtime)
+    console.print(f"[d]Finished in", runtime)
     console.print(f"Installed {md.app_name} to "
                   f"[yellow]{console.link(str(install_dir.parent) + os.path.sep, install_dir.parent)}[/]"
                   f"[l_yellow]{console.link(install_dir.name + os.path.sep, install_dir)}[/]")

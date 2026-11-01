@@ -13,10 +13,10 @@ INDENT = 2
 
 class Char:
     INDENT = "[indent]\u2502[/]"
-    TREE_TRUNK = "[magenta][dim]\u2502[/]"
-    TREE_BRANCH = "[magenta][dim]\u251c[/]"
-    TREE_LAST = "[magenta][dim]\u2514[/]"
-    TREE_LEAF = "[magenta][dim]\u2500[/]"
+    TREE_TRUNK = "[magenta][d]\u2502[/]"
+    TREE_BRANCH = "[magenta][d]\u251c[/]"
+    TREE_LAST = "[magenta][d]\u2514[/]"
+    TREE_LEAF = "[magenta][d]\u2500[/]"
 
 
 def _make_indent(indent: int) -> str:
@@ -70,8 +70,8 @@ def _make_zipinfo_name(obj: zipfile.ZipInfo, **kwargs) -> str:
     elif name.endswith(".py") or name.endswith(".pyw"):
         style = "[l_blue]"
     if name.startswith("__"):
-        style += "[italic]"
-    return f"{style}{name}[/] [dim][number]{size_str}[/] [dim][l_green]{time_str}[/]"
+        style += "[i]"
+    return f"{style}{name}[/] [d][number]{size_str}[/] [d][l_green]{time_str}[/]"
 
 
 def _prepr_zipdir(header: str, parent: Path, **kwargs) -> str:
@@ -106,7 +106,7 @@ def prepr(obj, **kwargs) -> str:
 def _(obj: zipfile.ZipFile, **_) -> str:
     sizes = _calculate_zipfile_sizes(obj)
     name = (obj.filename or "[error]Unnamed Archive").rpartition(os.path.sep)[2]
-    header = f"[name]{name} [number][dim]{_format_bytes(sizes["./"])}[/]"
+    header = f"[name]{name} [number][d]{_format_bytes(sizes["./"])}[/]"
     return _prepr_zipdir(header, Path(), infolist=obj.infolist(), sizes=sizes)
 
 @prepr.register

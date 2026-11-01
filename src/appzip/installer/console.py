@@ -14,9 +14,9 @@ from .utils import can_interact
 
 log = logging.getLogger(__name__)
 
-CONFIRM_YES = " [bold][[l_green]Y[fg]/[l_red]n[fg]][/] "
-CONFIRM_NO = " [bold][[l_green]y[fg]/[l_red]N[fg]][/] "
-STATUS_SPINNER = "[blink][l_green]\u25cf[/] "
+CONFIRM_YES = " [b][[l_green]Y[fg]/[l_red]n[fg]][/] "
+CONFIRM_NO = " [b][[l_green]y[fg]/[l_red]N[fg]][/] "
+STATUS_SPINNER = "[f][l_green]\u25cf[/] "
 
 
 class ThemeFormatter(logging.Formatter):

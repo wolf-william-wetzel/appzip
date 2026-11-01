@@ -1,169 +1,110 @@
 from dataclasses import dataclass, fields
+from functools import cache
 
 from .utils import can_colorize
 
 
-class SGR:
-    RESET = "\x1b[0m"
+@dataclass
+class ANSI:
+    reset: str = "\x1b[0m"
+    # Styles.
+    b: str = "\x1b[1m"  # Bold.
+    d: str = "\x1b[2m"  # Dim.
+    i: str = "\x1b[3m"  # Italic
+    u: str = "\x1b[4m"  # Underline.
+    f: str = "\x1b[5m"  # Blink.
+    r: str = "\x1b[7m"  # Reverse.
+    s: str = "\x1b[9m"  # Strikethrough.
+    # Disable styles.
+    nb: str = "\x1b[22m"  # Also disables dim.
+    nd: str = "\x1b[22m"  # Also disables bold.
+    ni: str = "\x1b[23m"
+    nu: str = "\x1b[24m"
+    nf: str = "\x1b[25m"
+    nr: str = "\x1b[27m"
+    ns: str = "\x1b[29m"
+    # Default colors.
+    fg: str = "\x1b[39m"
+    bg: str = "\x1b[49m"
+    # Colors.
+    black: str = "\x1b[30m"
+    red: str = "\x1b[31m"
+    green: str = "\x1b[32m"
+    yellow: str = "\x1b[33m"
+    blue: str = "\x1b[34m"
+    magenta: str = "\x1b[35m"
+    cyan: str = "\x1b[36m"
+    l_gray: str = "\x1b[37m"
+    # Bright colors.
+    gray: str = "\x1b[90m"
+    l_red: str = "\x1b[91m"
+    l_green: str = "\x1b[92m"
+    l_yellow: str = "\x1b[93m"
+    l_blue: str = "\x1b[94m"
+    l_magenta: str = "\x1b[95m"
+    l_cyan: str = "\x1b[96m"
+    white: str = "\x1b[97m"
+    # Background colors.
+    black_bg: str = "\x1b[40m"
+    red_bg: str = "\x1b[41m"
+    green_bg: str = "\x1b[42m"
+    yellow_bg: str = "\x1b[43m"
+    blue_bg: str = "\x1b[44m"
+    magenta_bg: str = "\x1b[45m"
+    cyan_bg: str = "\x1b[46m"
+    l_gray_bg: str = "\x1b[47m"
+    # Bright background colors.
+    gray_bg: str = "\x1b[100m"
+    l_red_bg: str = "\x1b[101m"
+    l_green_bg: str = "\x1b[102m"
+    l_yellow_bg: str = "\x1b[103m"
+    l_blue_bg: str = "\x1b[104m"
+    l_magenta_bg: str = "\x1b[105m"
+    l_cyan_bg: str = "\x1b[106m"
+    white_bg: str = "\x1b[107m"
 
-    BOLD = "\x1b[1m"
-    DIM = "\x1b[2m"
-    ITALIC = "\x1b[3m"
-    UNDERLINE = "\x1b[4m"
-    BLINK = "\x1b[5m"
-    REVERSE = "\x1b[7m"
-    STRIKE = "\x1b[9m"
-
-    NOT_BOLD = "\x1b[22m"
-    NOT_DIM = "\x1b[22m"
-    NOT_ITALIC = "\x1b[23m"
-    NOT_UNDERLINE = "\x1b[24m"
-    NOT_BLINK = "\x1b[25m"
-    NOT_REVERSE = "\x1b[27m"
-    NOT_STRIKE = "\x1b[29m"
-
-    DEFAULT_FG = "\x1b[39m"
-    DEFAULT_BG = "\x1b[49m"
-
-    BLACK = "\x1b[30m"
-    RED = "\x1b[31m"
-    GREEN = "\x1b[32m"
-    YELLOW = "\x1b[33m"
-    BLUE = "\x1b[34m"
-    MAGENTA = "\x1b[35m"
-    CYAN = "\x1b[36m"
-    LIGHT_GRAY = "\x1b[37m"
-
-    DARK_GRAY = "\x1b[90m"
-    LIGHT_RED = "\x1b[91m"
-    LIGHT_GREEN = "\x1b[92m"
-    LIGHT_YELLOW = "\x1b[93m"
-    LIGHT_BLUE = "\x1b[94m"
-    LIGHT_MAGENTA = "\x1b[95m"
-    LIGHT_CYAN = "\x1b[96m"
-    WHITE = "\x1b[97m"
-
-    BG_BLACK = "\x1b[40m"
-    BG_RED = "\x1b[41m"
-    BG_GREEN = "\x1b[42m"
-    BG_YELLOW = "\x1b[43m"
-    BG_BLUE = "\x1b[44m"
-    BG_MAGENTA = "\x1b[45m"
-    BG_CYAN = "\x1b[46m"
-    BG_LIGHT_GRAY = "\x1b[47m"
-
-    BG_DARK_GRAY = "\x1b[100m"
-    BG_LIGHT_RED = "\x1b[101m"
-    BG_LIGHT_GREEN = "\x1b[102m"
-    BG_LIGHT_YELLOW = "\x1b[103m"
-    BG_LIGHT_BLUE = "\x1b[104m"
-    BG_LIGHT_MAGENTA = "\x1b[105m"
-    BG_LIGHT_CYAN = "\x1b[106m"
-    BG_WHITE = "\x1b[107m"
-
-
-SGR_CODES = set()
-for attr, code in vars(SGR).items():
-    if not attr.startswith("__"):
-        SGR_CODES.add(code)
+    @classmethod
+    @cache
+    def all_codes(cls) -> set:
+        return {f.default for f in fields(cls)}
 
 
 def decolor(text: str) -> str:
     """Remove ANSI codes from a string."""
-    for sgr_code in SGR_CODES:
-        text.replace(sgr_code, "")
+    for code in ANSI.all_codes():
+        text.replace(code, "")
     return text
 
 
 @dataclass
-class Theme:
-    reset: str = SGR.RESET
-    # Standard styles.
-    bold: str = SGR.BOLD
-    dim: str = SGR.DIM
-    italic: str = SGR.ITALIC
-    underline: str = SGR.UNDERLINE
-    blink: str = SGR.BLINK
-    reverse: str = SGR.REVERSE
-    strike: str = SGR.STRIKE
-    # Reverse styles.
-    not_bold: str = SGR.NOT_BOLD
-    not_dim: str = SGR.NOT_DIM
-    not_italic: str = SGR.NOT_ITALIC
-    not_underline: str = SGR.NOT_UNDERLINE
-    not_blink: str = SGR.NOT_BLINK
-    not_reverse: str = SGR.NOT_REVERSE
-    not_strike: str = SGR.NOT_STRIKE
-    # Defaults.
-    fg: str = SGR.DEFAULT_FG
-    bg: str = SGR.DEFAULT_BG
-    # Standard colors.
-    black: str = SGR.BLACK
-    red: str = SGR.RED
-    green: str = SGR.GREEN
-    yellow: str = SGR.YELLOW
-    blue: str = SGR.BLUE
-    magenta: str = SGR.MAGENTA
-    cyan: str = SGR.CYAN
-    l_gray: str = SGR.LIGHT_GRAY
-    # Bright colors.
-    gray: str = SGR.DARK_GRAY
-    l_red: str = SGR.LIGHT_RED
-    l_green: str = SGR.LIGHT_GREEN
-    l_yellow: str = SGR.LIGHT_YELLOW
-    l_blue: str = SGR.LIGHT_BLUE
-    l_magenta: str = SGR.LIGHT_MAGENTA
-    l_cyan: str = SGR.LIGHT_CYAN
-    white: str = SGR.WHITE
-    # Background colors.
-    black_bg: str = SGR.BG_BLACK
-    red_bg: str = SGR.BG_RED
-    green_bg: str = SGR.BG_GREEN
-    yellow_bg: str = SGR.BG_YELLOW
-    blue_bg: str = SGR.BG_BLUE
-    magenta_bg: str = SGR.BG_MAGENTA
-    cyan_bg: str = SGR.BG_CYAN
-    l_gray_bg: str = SGR.BG_LIGHT_GRAY
-    # Bright background colors.
-    gray_bg: str = SGR.BG_DARK_GRAY
-    l_red_bg: str = SGR.BG_LIGHT_RED
-    l_green_bg: str = SGR.BG_LIGHT_GREEN
-    l_yellow_bg: str = SGR.BG_LIGHT_YELLOW
-    l_blue_bg: str = SGR.BG_LIGHT_BLUE
-    l_magenta_bg: str = SGR.BG_LIGHT_MAGENTA
-    l_cyan_bg: str = SGR.BG_LIGHT_CYAN
-    white_bg: str = SGR.BG_WHITE
+class Theme(ANSI):
     # Logging.
-    log_time: str = SGR.DIM + SGR.CYAN
-    log_debug: str = SGR.GREEN
-    log_info: str = SGR.BLUE
-    log_warning: str = SGR.LIGHT_YELLOW
-    log_error: str = SGR.BOLD + SGR.LIGHT_RED
-    log_critical: str = SGR.BOLD + SGR.WHITE + SGR.BG_RED
+    log_time: str = ANSI.d + ANSI.cyan
+    log_debug: str = ANSI.green
+    log_info: str = ANSI.blue
+    log_warning: str = ANSI.l_yellow
+    log_error: str = ANSI.b + ANSI.l_red
+    log_critical: str = ANSI.b + ANSI.white + ANSI.red_bg
     # Repr.
-    string: str = SGR.GREEN
-    number: str = SGR.CYAN + SGR.BOLD
-    error: str = SGR.RED + SGR.BOLD
-    time: str = SGR.LIGHT_GREEN + SGR.BOLD
-    true: str = SGR.LIGHT_GREEN + SGR.ITALIC
-    false: str = SGR.LIGHT_RED + SGR.ITALIC
-    none: str = SGR.MAGENTA + SGR.ITALIC
-    brace: str = SGR.BOLD
-    name: str = SGR.BOLD + SGR.MAGENTA
-    attr: str = SGR.YELLOW
-    bytes: str = SGR.LIGHT_GREEN
-    ellipsis: str = SGR.YELLOW
-    indent: str = SGR.GREEN + SGR.DIM
-    path: str = SGR.MAGENTA
-    filename: str = SGR.LIGHT_MAGENTA
-    notimpl: str = SGR.ITALIC + SGR.RED
-    dataclass: str = SGR.LIGHT_YELLOW + SGR.ITALIC
-    hint: str = SGR.CYAN
-    default: str = SGR.RESET
-    doc: str = SGR.DIM + SGR.ITALIC + SGR.GREEN
-    app: str = SGR.LIGHT_CYAN
-    version: str = SGR.BOLD + SGR.CYAN
-    link: str = SGR.LIGHT_BLUE
+    string: str = ANSI.green
+    number: str = ANSI.cyan + ANSI.b
+    error: str = ANSI.red + ANSI.b
+    time: str = ANSI.l_green + ANSI.b
+    true: str = ANSI.l_green + ANSI.i
+    false: str = ANSI.l_red + ANSI.i
+    none: str = ANSI.magenta + ANSI.i
+    brace: str = ANSI.b
+    name: str = ANSI.b + ANSI.magenta
+    attr: str = ANSI.yellow
+    bytes: str = ANSI.l_green
+    ellipsis: str = ANSI.yellow
+    indent: str = ANSI.green + ANSI.d
+    path: str = ANSI.magenta
+    filename: str = ANSI.l_magenta
+    notimpl: str = ANSI.i + ANSI.red
+    app: str = ANSI.l_cyan
+    version: str = ANSI.b + ANSI.cyan
+    link: str = ANSI.l_blue
 
     @classmethod
     def no_colors(cls):
