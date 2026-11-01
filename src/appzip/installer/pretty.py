@@ -7,16 +7,17 @@ from pathlib import Path
 import os
 import zipfile
 from collections import Counter
+import stat
 
 INDENT = 2
 
 
 class Char:
     INDENT = "[indent]\u2502[/]"
-    TREE_TRUNK = "[magenta][d]\u2502[/]"
-    TREE_BRANCH = "[magenta][d]\u251c[/]"
-    TREE_LAST = "[magenta][d]\u2514[/]"
-    TREE_LEAF = "[magenta][d]\u2500[/]"
+    TREE_TRUNK = "[tree]\u2502[/]"
+    TREE_BRANCH = "[tree]\u251c[/]"
+    TREE_LAST = "[tree]\u2514[/]"
+    TREE_LEAF = "[tree]\u2500[/]"
 
 
 def _make_indent(indent: int) -> str:
@@ -63,18 +64,22 @@ def _make_zipinfo_name(obj: zipfile.ZipInfo, **kwargs) -> str:
     size_str = f"{_format_bytes(kwargs.get("sizes", Counter())[obj.filename])}"
     time_str = "{0}-{1}-{2} {3:0>2}:{4:0>2}:{5:0>2}".format(*obj.date_time)
     name = obj.filename.removesuffix("/").rpartition("/")[2]
-    style = "[yellow]"
+    mode = obj.external_attr >> 16
+    style = "[file]"
     if obj.is_dir():
-        name += "/"
-        style = "[l_magenta]"
+        style = "[dir]"
     elif name.endswith(".py") or name.endswith(".pyw"):
-        style = "[l_blue]"
+        style = "[pyfile]"
     if name.startswith("__"):
-        style += "[i]"
-    return f"{style}{name}[/] [d][number]{size_str}[/] [d][l_green]{time_str}[/]"
+        style += "[dunder_file]"
+    if name.startswith("."):
+        style += "[dotfile]"
+    if stat.S_ISLNK(mode):
+        style += "[symlink]"
+    return f"{style}{name}[/] [filesize]{size_str}[/] [filemode]{stat.filemode(mode)}[/] [timestamp]{time_str}[/]"
 
 
-def _prepr_zipdir(header: str, parent: Path, **kwargs) -> str:
+def _prepr_zipdir(header: str, parent: Path = Path(), **kwargs) -> str:
     indent: str = kwargs.get("indent", "")
     middle = []
     children = [i for i in kwargs.get("infolist", []) if Path(i.filename).parent == parent]
@@ -105,9 +110,20 @@ def prepr(obj, **kwargs) -> str:
 @prepr.register
 def _(obj: zipfile.ZipFile, **_) -> str:
     sizes = _calculate_zipfile_sizes(obj)
-    name = (obj.filename or "[error]Unnamed Archive").rpartition(os.path.sep)[2]
-    header = f"[name]{name} [number][d]{_format_bytes(sizes["./"])}[/]"
-    return _prepr_zipdir(header, Path(), infolist=obj.infolist(), sizes=sizes)
+    if obj.filename:
+        name = obj.filename.rpartition(os.path.sep)[2]
+        stat_result = Path(obj.filename).stat()
+        size = stat_result.st_size
+        mode = stat.filemode(stat_result.st_mode)
+    else:
+        name = "[error]Unnamed Archive"
+        size = sizes["./"]
+        mode = ""
+    return _prepr_zipdir(
+        f"[name]{name} [filesize]{_format_bytes(size)}[/] [filemode]{mode}[/]",
+        infolist=obj.infolist(),
+        sizes=sizes,
+    )
 
 @prepr.register
 def _(obj: zipfile.ZipInfo, **kwargs) -> str:

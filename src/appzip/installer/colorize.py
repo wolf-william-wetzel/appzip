@@ -102,9 +102,21 @@ class Theme(ANSI):
     path: str = ANSI.magenta
     filename: str = ANSI.l_magenta
     notimpl: str = ANSI.i + ANSI.red
+    # Output styles.
     app: str = ANSI.l_cyan
     version: str = ANSI.b + ANSI.cyan
     link: str = ANSI.l_blue
+    # File trees.
+    tree: str = ANSI.magenta + ANSI.d
+    file: str = ANSI.yellow
+    dir: str = ANSI.l_magenta
+    pyfile: str = ANSI.l_blue
+    dunder_file: str = ANSI.i
+    timestamp: str = ANSI.l_green + ANSI.d
+    filesize: str = ANSI.d + ANSI.cyan + ANSI.b
+    dotfile: str = ANSI.d
+    symlink: str = ANSI.u
+    filemode: str = ANSI.d
 
     @classmethod
     def no_colors(cls):
