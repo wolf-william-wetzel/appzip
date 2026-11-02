@@ -143,7 +143,11 @@ class Console:
         if not self.interactive:
             return default
         self.print(prompt, end="")
-        return input() or default
+        text = self.live.text
+        self.live.update("")
+        result = input() or default
+        self.live.update(text)
+        return result
 
     def confirm(self, prompt: str, default: bool = False) -> bool:
         return self.input(prompt + (CONFIRM_YES if default else CONFIRM_NO), "ny"[default]).lower() == "y"
