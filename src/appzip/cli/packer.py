@@ -3,7 +3,7 @@ from pathlib import Path, UnsupportedOperation
 from annotationlib import get_annotations
 import shutil
 import time
-import zipapp
+import zipfile
 import datetime as dt
 import sys
 from functools import partial
@@ -35,8 +35,11 @@ log = logging.getLogger(__name__)
 prepr = partial(pretty_repr, indent_size=2, expand_all=True)
 
 PARENT_PACKAGE = Path(__file__).resolve().parent.parent
-INSTALLER_LIB = PARENT_PACKAGE / "installer"
-INSTALLER_ENTRY_POINT = f"{INSTALLER_LIB.name}:main"
+INSTALLER_NAME = "installer"
+INSTALLER_MAIN_PY = f"""\
+import {INSTALLER_NAME}
+{INSTALLER_NAME}.main()
+"""
 
 PROGRESS_COLUMNS = (
     TextColumn("[progress.description]{task.description}"),  # noqa
@@ -73,8 +76,8 @@ class Metadata(msgspec.Struct):
 def add_installer_resources(cfg: Config):
     """Add the installer resources to the current build."""
     # Copy the installer lib.
-    log.info(f"Copying installer lib to {Format.path(cfg.dest_dir / INSTALLER_LIB.name)}/")
-    INSTALLER_LIB.copy_into(cfg.dest_dir)
+    log.info(f"Copying installer lib to {Format.path(cfg.dest_dir / INSTALLER_NAME)}/")
+    (PARENT_PACKAGE / INSTALLER_NAME).copy_into(cfg.dest_dir)
     # Write metadata.
     log.info(f"Writing installer metadata to {Format.path(cfg.metadata_file)}")
     with open(cfg.metadata_file, "wb") as f:
@@ -159,6 +162,32 @@ def term_progress(console: Console, state: int = 0, number: int = 0):
         console.out(f"\x1b]9;4;{state};{number}\x1b\\", end="")
 
 
+def zip_installer(src: Path, dest: Path):
+    files: dict[Path, str] = {}
+    for path in sorted(src.rglob("*")):
+        files[path] = path.relative_to(src).as_posix()
+
+    if dest in files:
+        raise AppzipError(f"The target archive {dest} overwrites one of the source files.")
+
+    with zipfile.ZipFile(dest, mode="w") as zf:
+        for path, name in files.items():
+            # File or directory.
+            if not path.is_symlink():
+                zf.write(path, name)
+                continue
+            # Symlinks.
+            st = path.lstat()
+            info = zipfile.ZipInfo(name, time.localtime(st.st_mtime)[:6])  # noqa
+            info.file_size = st.st_size
+            info.external_attr = st.st_mode << 16
+            target = path.readlink()
+            dir_marker = "/" if (path.parent / target).is_dir() else ""
+            zf.writestr(info, target.as_posix() + dir_marker)
+        # Entry point.
+        zf.writestr("__main__.py", INSTALLER_MAIN_PY)
+
+
 def pack(cfg: Config, console: Console | None = None):
     """Pack the project."""
     if console is None:
@@ -199,7 +228,7 @@ def pack(cfg: Config, console: Console | None = None):
     # Zip the project.
     log.info(f"Packing installer to {Format.path(cfg.installer_path)}")
     with console.status("Packing installer"):
-        zipapp.create_archive(cfg.dest_dir, cfg.installer_path, main=INSTALLER_ENTRY_POINT)
+        zip_installer(cfg.dest_dir, cfg.installer_path)
 
     # Print exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)

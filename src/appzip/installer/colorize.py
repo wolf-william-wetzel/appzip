@@ -115,7 +115,7 @@ class Theme(ANSI):
     timestamp: str = ANSI.l_green + ANSI.d
     filesize: str = ANSI.d + ANSI.cyan + ANSI.b
     dotfile: str = ANSI.d
-    symlink: str = ANSI.u
+    symlink: str = ANSI.u + ANSI.l_yellow
     filemode: str = ANSI.d
 
     @classmethod

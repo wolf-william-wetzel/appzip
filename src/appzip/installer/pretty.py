@@ -1,3 +1,4 @@
+import time
 from dataclasses import is_dataclass, fields, MISSING
 from functools import singledispatch
 import datetime as dt
@@ -10,6 +11,7 @@ from collections import Counter
 import stat
 
 INDENT = 2
+TIMESTAMP_TEMPLATE = "[timestamp]{0}-{1}-{2} {3:0>2}:{4:0>2}:{5:0>2}[/]"
 
 
 class Char:
@@ -60,23 +62,34 @@ def _format_bytes(number: int) -> str:
     return f"{number} B"
 
 
-def _make_zipinfo_name(obj: zipfile.ZipInfo, **kwargs) -> str:
-    size_str = f"{_format_bytes(kwargs.get("sizes", Counter())[obj.filename])}"
-    time_str = "{0}-{1}-{2} {3:0>2}:{4:0>2}:{5:0>2}".format(*obj.date_time)
-    name = obj.filename.removesuffix("/").rpartition("/")[2]
-    mode = obj.external_attr >> 16
+def _style_zipinfo_name(name: str, symlink: bool = False) -> str:
+    stem = name.removesuffix("/").rpartition("/")[2]
     style = "[file]"
-    if obj.is_dir():
+    if symlink:
+        style = "[symlink]"
+    elif name.endswith("/"):
         style = "[dir]"
     elif name.endswith(".py") or name.endswith(".pyw"):
         style = "[pyfile]"
-    if name.startswith("__"):
+    if stem.startswith("__"):
         style += "[dunder_file]"
-    if name.startswith("."):
+    if stem.startswith("."):
         style += "[dotfile]"
-    if stat.S_ISLNK(mode):
-        style += "[symlink]"
-    return f"{style}{name}[/] [filesize]{size_str}[/] [filemode]{stat.filemode(mode)}[/] [timestamp]{time_str}[/]"
+    return f"{style}{stem}[/]"
+
+
+def _make_zipinfo_name(obj: zipfile.ZipInfo, **kwargs) -> str:
+    size_str = f"{_format_bytes(kwargs.get("sizes", Counter())[obj.filename])}"
+    time_str = TIMESTAMP_TEMPLATE.format(*obj.date_time)
+    mode = obj.external_attr >> 16
+    is_link = stat.S_ISLNK(mode)
+    name = _style_zipinfo_name(obj.filename, is_link)
+    if is_link and (zf := kwargs.get("zf", "")):
+        target = zf.read(obj).decode("utf-8")
+        parents = target.removesuffix("/").rpartition("/")[0]
+        parents = f"[dir]{parents}/" if parents else ""
+        name += f" [d][l_yellow]-> {parents}[/]{_style_zipinfo_name(target)}"
+    return f"{name} [filesize]{size_str}[/] [filemode]{stat.filemode(mode)}[/] {time_str}"
 
 
 def _prepr_zipdir(header: str, parent: Path = Path(), **kwargs) -> str:
@@ -110,19 +123,21 @@ def prepr(obj, **kwargs) -> str:
 @prepr.register
 def _(obj: zipfile.ZipFile, **_) -> str:
     sizes = _calculate_zipfile_sizes(obj)
+    name = "[error]Unnamed Archive"
+    size = sizes["./"]
+    mode = ""
+    timestamp = ""
     if obj.filename:
         name = obj.filename.rpartition(os.path.sep)[2]
-        stat_result = Path(obj.filename).stat()
-        size = stat_result.st_size
-        mode = stat.filemode(stat_result.st_mode)
-    else:
-        name = "[error]Unnamed Archive"
-        size = sizes["./"]
-        mode = ""
+        st = Path(obj.filename).stat()
+        size = st.st_size
+        mode = stat.filemode(st.st_mode)
+        timestamp = TIMESTAMP_TEMPLATE.format(*time.localtime(st.st_mtime)[:6])
     return _prepr_zipdir(
-        f"[name]{name} [filesize]{_format_bytes(size)}[/] [filemode]{mode}[/]",
+        f"[name]{name} [filesize]{_format_bytes(size)}[/] [filemode]{mode}[/] {timestamp}",
         infolist=obj.infolist(),
         sizes=sizes,
+        zf=obj,
     )
 
 @prepr.register

@@ -4,12 +4,13 @@ import logging
 import os
 import time
 import datetime as dt
-from pathlib import Path
+from pathlib import Path, UnsupportedOperation
 from zipfile import ZipFile
 from shutil import rmtree
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 import venv
 import subprocess
+import stat
 
 from .metadata import Metadata
 from .console import Console
@@ -121,13 +122,32 @@ def main():
     log.info(f"Installing {md.app_name} to %s", install_dir)
 
     # Install the app.
-    with console.status("Installing...") as live:
+    with console.status("Extracting..."):
         log.info(f"Extracting {md.app_name} from %s", PYZ_PATH)
         with ZipFile(PYZ_PATH) as zf:
-            zf.extractall(path=install_dir, members=[n for n in zf.namelist() if n.startswith("app/")])
+            for info in zf.infolist():
+                # Extract only the embedded app.
+                if not info.filename.startswith("app/"):
+                    continue
+                # Treat non-symlinks normally.
+                if not stat.S_ISLNK(info.external_attr >> 16):
+                    zf.extract(info, install_dir)
+                    continue
+                # Create symlinks.
+                path = install_dir / info.filename
+                target = zf.read(info).decode("utf-8")
+                try:
+                    path.symlink_to(target, (path.parent / target).is_dir())
+                except UnsupportedOperation:
+                    log.error("Symlink creation not available: %s -> %s", path, target)
+                except OSError:
+                    log.error("Cannot create symlink: %s -> %s", path, target)
+                    if PLATFORM is Platform.WINDOWS:
+                        log.error("Try running as administrator or activating Windows Developer Mode.")
 
-        # Install dependencies.
-        if md.dependencies:
+    # Install dependencies.
+    if md.dependencies:
+        with console.status("Installing...") as live:
             log.info("Installing dependencies...")
             venv_dir = install_dir / "app" / ".venv"
             log.debug(f"Creating virtual environment at %s", venv_dir)
@@ -154,8 +174,8 @@ def main():
                 [str(venv_py), "-m", "pip", "install", *md.dependencies],
                 stdout=None if show_pip_output else subprocess.DEVNULL,
             )
-        else:
-            log.debug("No dependencies to install.")
+    else:
+        log.debug("No dependencies to install.")
 
     # Continue installation.
     with console.status("Finishing up..."):
