@@ -95,7 +95,8 @@ def _make_zipinfo_name(obj: zipfile.ZipInfo, **kwargs) -> str:
 def _prepr_zipdir(header: str, parent: Path = Path(), **kwargs) -> str:
     indent: str = kwargs.get("indent", "")
     middle = []
-    children = [i for i in kwargs.get("infolist", []) if Path(i.filename).parent == parent]
+    infolist = kwargs["zf"].infolist() if "zf" in kwargs else []
+    children = [i for i in infolist if Path(i.filename).parent == parent]
     for i, info in enumerate(children):
         last = i == len(children) - 1
         pre_string = indent + (Char.TREE_BRANCH, Char.TREE_LAST)[last] + Char.TREE_LEAF
@@ -135,7 +136,6 @@ def _(obj: zipfile.ZipFile, **_) -> str:
         timestamp = TIMESTAMP_TEMPLATE.format(*time.localtime(st.st_mtime)[:6])
     return _prepr_zipdir(
         f"[name]{name} [filesize]{_format_bytes(size)}[/] [filemode]{mode}[/] {timestamp}",
-        infolist=obj.infolist(),
         sizes=sizes,
         zf=obj,
     )
