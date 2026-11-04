@@ -8,9 +8,9 @@ try:
 except ImportError:
     fd = None
 
-from .colorize import get_theme, decolor
+from .colorize import Theme, decolor
 from .pretty import prepr
-from .utils import can_interact
+from .utils import can_interact, can_colorize
 
 log = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ STATUS_SPINNER = "[f][l_green]\u25cf[/] "
 
 
 class ThemeFormatter(logging.Formatter):
-    def __init__(self, theme):
+    def __init__(self, theme: Theme):
         self.theme = theme
         self.log_level_styles = {
             "DEBUG": self.theme.log_debug,
@@ -98,13 +98,14 @@ class Console:
     def __init__(self, file=None, interactive: bool | None = None):
         """If ``file`` is ``None``, default to ``sys.stdout``."""
         self.file = file
-        self.theme = get_theme(file)
+        self.colorized = can_colorize(file)
         self.interactive = can_interact(file) if interactive is None else interactive
+        self.theme = Theme() if self.colorized else Theme.no_colors()
         self.live = Live(self)
         atexit.register(self.progress)
 
     def link(self, text, link: str | None = None):
-        if not self.interactive:
+        if not self.colorized:
             return text
         return f"\x1b]8;;{text if link is None else link}\x1b\\{text}\x1b]8;;\x1b\\"
 

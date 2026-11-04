@@ -1,8 +1,6 @@
 from dataclasses import dataclass, fields
 from functools import cache
 
-from .utils import can_colorize
-
 
 @dataclass
 class ANSI:
@@ -106,6 +104,8 @@ class Theme(ANSI):
     app: str = ANSI.l_cyan
     version: str = ANSI.b + ANSI.cyan
     link: str = ANSI.l_blue
+    example: str = ANSI.magenta
+    header: str = ANSI.b + ANSI.blue
     # File trees.
     tree: str = ANSI.magenta + ANSI.d
     file: str = ANSI.yellow
@@ -124,12 +124,7 @@ class Theme(ANSI):
 
     def style(self, text: str, reset: bool = True) -> str:
         """Style ``text`` with rich-like markup."""
-        if not text: return text
-        for f in fields(self):
-            text = text.replace(f"[{f.name}]", getattr(self, f.name))
+        if text:
+            for f in fields(self):
+                text = text.replace(f"[{f.name}]", getattr(self, f.name))
         return text.replace("[/]", self.reset) + (self.reset if reset else "")
-
-
-def get_theme(file=None) -> Theme:
-    """Get a styled or non-styled Theme object. ``file`` defaults to ``sys.stdout``."""
-    return Theme() if can_colorize(file) else Theme.no_colors()
