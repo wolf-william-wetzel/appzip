@@ -9,17 +9,15 @@ def getenv(var: str, fallback: str = "") -> str:
     except Exception:  # noqa
         return fallback
 
+LOG_LEVELS = logging.getLevelNamesMapping()
+LOG_LEVELS.pop("CRITICAL")
+LOG_LEVELS.pop("WARNING")
+LOG_LEVELS.pop("NOTSET")
 
-level_str = "WARNING"  # Default level.
-if level := getenv("LOGLEVEL"):
-    level_str = level
-elif level := getenv("LOG_LEVEL"):
-    level_str = level
-elif getenv("DEBUG"):
-    level_str = "DEBUG"
-LOG_LEVEL: int = logging.getLevelNamesMapping().get(level_str.upper(), logging.WARNING)
-del level_str
-
+LOG_LEVEL = (getenv("LOGLEVEL") or getenv("LOG_LEVEL")).upper()
+LOG_LEVEL = {"CRITICAL": "FATAL", "WARNING": "WARN"}.get(LOG_LEVEL, LOG_LEVEL)
+if LOG_LEVEL not in LOG_LEVELS:
+    LOG_LEVEL = "DEBUG" if getenv("DEBUG") else "WARN"
 
 def is_term(file=None) -> bool:
     """Modified from the Python 3.15 stdlib."""

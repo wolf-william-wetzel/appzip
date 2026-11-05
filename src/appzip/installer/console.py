@@ -104,6 +104,12 @@ class Console:
         self.live = Live(self)
         atexit.register(self.progress)
 
+    def __str__(self) -> str:
+        return (f"[name]{self.__class__.__name__}[/][brace]([/]"
+                f"[attr]colorized[/]={prepr(self.colorized)}, "
+                f"[attr]interactive[/]={prepr(self.interactive)}"
+                f"[brace])[/]")
+
     def link(self, text, link: str | None = None):
         if not self.colorized:
             return text
