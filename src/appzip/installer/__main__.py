@@ -4,23 +4,23 @@ import logging
 import os
 import time
 import datetime as dt
-from pathlib import Path, UnsupportedOperation
+from pathlib import Path
 from zipfile import ZipFile
 from shutil import rmtree
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 import venv
-import subprocess
-import stat
 
 from .metadata import Metadata
 from .console import Console
-from .folder import get_install_dir, PLATFORM, Platform
-from .utils import LOG_LEVEL, LOG_LEVELS
+from .folder import get_install_dir
 from .pretty import prepr
+from .utils import *
 
 START_TIME = time.perf_counter_ns()
 PYZ_PATH = Path(__file__).parent.parent
 ZF = ZipFile(PYZ_PATH)  # Doesn't need to be closed since we aren't writing.
+VENV_NAME = ".venv"  # Name of installation venv.
+SUBPROCESS_LOG_LEVEL = logging.DEBUG
 
 console = Console(sys.stdout)
 
@@ -74,6 +74,7 @@ def main():
     args = parser.parse_args()
     args.path = args.path.expanduser().resolve()
     args.log = LOG_LEVELS[args.log]
+    show_subprocess_output = args.log <= SUBPROCESS_LOG_LEVEL
 
     # Set up logging.
     log = logging.getLogger()
@@ -82,13 +83,11 @@ def main():
     log.debug(args)
 
     # Load metadata.
-    log.info("Loading metadata...")
     console.status("Loading metadata...")
     md = Metadata.from_json(ZF.read("metadata.json"))
     log.debug(md)
 
     # Verify proper python version.
-    log.info("Checking python version...")
     console.status("Checking python version...")
     py_hex_str = f"{md.minimum_python:0>8x}"
     major, minor = int(py_hex_str[:2], 16), int(py_hex_str[2:4], 16)
@@ -132,62 +131,29 @@ def main():
 
     # Install the app.
     console.status("Extracting...")
-    log.info(f"Extracting {md.app_name} from [filename]{PYZ_PATH.name}[/]")
-    for info in ZF.infolist():
-        # Extract only the embedded app.
-        if not info.filename.startswith("app/"):
-            continue
-        # Treat non-symlinks normally.
-        if not stat.S_ISLNK(info.external_attr >> 16):
-            ZF.extract(info, install_dir)
-            continue
-        # Create symlinks.
-        path = install_dir / info.filename
-        target = ZF.read(info).decode("utf-8")
-        try:
-            path.symlink_to(target, (path.parent / target).is_dir())
-        except UnsupportedOperation:
-            log.error("Symlink creation not available: %s -> %s", path, target)
-        except OSError:
-            log.error("Cannot create symlink: %s -> %s", path, target)
-            if PLATFORM is Platform.WINDOWS:
-                log.error("Try running as administrator or activating Windows Developer Mode.")
+    extract_subdir(ZF, "app/", install_dir)
 
     # Install dependencies.
     if md.dependencies:
-        console.status("Installing...")
-        venv_dir = install_dir / "app" / ".venv"
-        log.info(f"Creating virtual environment at %s", venv_dir)
-        venv.create(
-            venv_dir,
-            symlinks=PLATFORM is not Platform.WINDOWS,
-            with_pip=True,
-            upgrade_deps=True,
-        )
+        venv_dir = install_dir / "app" / VENV_NAME
+        log.debug("Venv: %s", venv_dir)
 
-        if (venv_dir / "bin").exists():
-            venv_py = venv_dir / "bin" / "python"
-        elif (venv_dir / "Scripts").exists():
-            venv_py = venv_dir / "Scripts" / "python.exe"
-        else:
-            console.exit(f"[error]No python executable found inside [path]{venv_dir}{os.path.sep}")
-        log.debug("Venv python: %s", venv_py.relative_to(venv_dir))  # noqa
+        # Create venv.
+        console.status(f"Creating virtual environment...")
+        venv.create(venv_dir, symlinks=not Platform.IS_WIN, with_pip=True, upgrade_deps=True)
 
-        log.info("Installing dependencies...")
-        log.debug(md.dependencies)
-        show_pip_output = args.log <= logging.INFO
-        if show_pip_output:
-            console.status("")  # Clear live before subprocess output ruins it.
-        subprocess.check_call(
-            [str(venv_py), "-m", "pip", "install", *md.dependencies],
-            stdout=None if show_pip_output else subprocess.DEVNULL,
-        )
+        # Install dependencies.
+        console.status("" if show_subprocess_output else "Installing dependencies...")
+        try:
+            venv_install(venv_dir, md.dependencies, show_subprocess_output)
+        except FileNotFoundError as exc:
+            console.exit(f"[error]{exc}")
     else:
         log.debug("No dependencies to install.")
 
     # Create entry points.
     console.status("Creating entry points...")
-    log.info("Creating entry points...")
+    pass
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)

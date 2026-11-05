@@ -122,7 +122,11 @@ class Console:
         if self.interactive:
             self.print(f"\x1b]9;4;{state};{percent}\x1b\\", end="")
 
+    # Status methods.
+
     def status(self, text: str):
+        if text:
+            log.info(text)
         self.live.update(STATUS_SPINNER + text)
 
     def _end_progress(self):

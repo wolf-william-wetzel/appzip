@@ -79,16 +79,20 @@ def _style_zipinfo_name(name: str, symlink: bool = False) -> str:
 
 
 def _make_zipinfo_name(obj: zipfile.ZipInfo, **kwargs) -> str:
-    size_str = f"{_format_bytes(kwargs.get("sizes", Counter())[obj.filename])}"
+    size_str = f"{_format_bytes(kwargs.get("sizes", {}).get(obj.filename) or obj.file_size)}"
     time_str = TIMESTAMP_TEMPLATE.format(*obj.date_time)
     mode = obj.external_attr >> 16
     is_link = stat.S_ISLNK(mode)
     name = _style_zipinfo_name(obj.filename, is_link)
-    if is_link and (zf := kwargs.get("zf", "")):
-        target = zf.read(obj).decode("utf-8")
-        parents = target.removesuffix("/").rpartition("/")[0]
-        parents = f"[dir]{parents}/" if parents else ""
-        name += f" [d][l_yellow]-> {parents}[/]{_style_zipinfo_name(target)}"
+    if is_link:
+        if zf := kwargs.get("zf", ""):
+            target = zf.read(obj).decode("utf-8")
+        else:
+            target = kwargs.get("symlink_target", "")
+        if target:
+            parents = target.removesuffix("/").rpartition("/")[0]
+            parents = f"[dir]{parents}/" if parents else ""
+            name += f" [d][l_yellow]-> {parents}[/]{_style_zipinfo_name(target)}"
     return f"{name} [filesize]{size_str}[/] [filemode]{stat.filemode(mode)}[/] {time_str}"
 
 
@@ -138,12 +142,13 @@ def _(obj: zipfile.ZipFile, **_) -> str:
         f"[name]{name} [filesize]{_format_bytes(size)}[/] [filemode]{mode}[/] {timestamp}",
         sizes=sizes,
         zf=obj,
+        recurse=True,
     )
 
 @prepr.register
 def _(obj: zipfile.ZipInfo, **kwargs) -> str:
     name = _make_zipinfo_name(obj, **kwargs)
-    if obj.is_dir():
+    if obj.is_dir() and kwargs.get("recurse", False):
         return _prepr_zipdir(name, Path(obj.filename), **kwargs)
     return name
 
