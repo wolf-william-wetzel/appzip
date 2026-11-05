@@ -71,7 +71,6 @@ parser.add_argument("-l", "--log",
 
 def main():
     # Parse arguments.
-    console.progress(3)
     args = parser.parse_args()
     args.path = args.path.expanduser().resolve()
     args.log = LOG_LEVELS[args.log]
@@ -84,17 +83,17 @@ def main():
 
     # Load metadata.
     log.info("Loading metadata...")
-    with console.status("Loading metadata..."):
-        md = Metadata.from_json(ZF.read("metadata.json"))
+    console.status("Loading metadata...")
+    md = Metadata.from_json(ZF.read("metadata.json"))
     log.debug(md)
 
     # Verify proper python version.
     log.info("Checking python version...")
-    with console.status("Checking python version..."):
-        py_hex_str = f"{md.minimum_python:0>8x}"
-        major, minor = int(py_hex_str[:2], 16), int(py_hex_str[2:4], 16)
-        if md.minimum_python > sys.hexversion:
-            console.exit(f"[error]Installer requires Python >={major}.{minor}, not {python_version()}")
+    console.status("Checking python version...")
+    py_hex_str = f"{md.minimum_python:0>8x}"
+    major, minor = int(py_hex_str[:2], 16), int(py_hex_str[2:4], 16)
+    if md.minimum_python > sys.hexversion:
+        console.exit(f"[error]Installer requires Python >={major}.{minor}, not {python_version()}")
     log.debug(f"Python [string]{python_version()}[/] >= [string]{major}.{minor}[/]")
 
     # Confirm the installation directory.
@@ -132,64 +131,63 @@ def main():
     log.info(f"Installing {md.app_name} to %s", install_dir)
 
     # Install the app.
-    with console.status("Extracting..."):
-        log.info(f"Extracting {md.app_name} from [filename]{PYZ_PATH.name}[/]")
-        for info in ZF.infolist():
-            # Extract only the embedded app.
-            if not info.filename.startswith("app/"):
-                continue
-            # Treat non-symlinks normally.
-            if not stat.S_ISLNK(info.external_attr >> 16):
-                ZF.extract(info, install_dir)
-                continue
-            # Create symlinks.
-            path = install_dir / info.filename
-            target = ZF.read(info).decode("utf-8")
-            try:
-                path.symlink_to(target, (path.parent / target).is_dir())
-            except UnsupportedOperation:
-                log.error("Symlink creation not available: %s -> %s", path, target)
-            except OSError:
-                log.error("Cannot create symlink: %s -> %s", path, target)
-                if PLATFORM is Platform.WINDOWS:
-                    log.error("Try running as administrator or activating Windows Developer Mode.")
+    console.status("Extracting...")
+    log.info(f"Extracting {md.app_name} from [filename]{PYZ_PATH.name}[/]")
+    for info in ZF.infolist():
+        # Extract only the embedded app.
+        if not info.filename.startswith("app/"):
+            continue
+        # Treat non-symlinks normally.
+        if not stat.S_ISLNK(info.external_attr >> 16):
+            ZF.extract(info, install_dir)
+            continue
+        # Create symlinks.
+        path = install_dir / info.filename
+        target = ZF.read(info).decode("utf-8")
+        try:
+            path.symlink_to(target, (path.parent / target).is_dir())
+        except UnsupportedOperation:
+            log.error("Symlink creation not available: %s -> %s", path, target)
+        except OSError:
+            log.error("Cannot create symlink: %s -> %s", path, target)
+            if PLATFORM is Platform.WINDOWS:
+                log.error("Try running as administrator or activating Windows Developer Mode.")
 
     # Install dependencies.
     if md.dependencies:
-        with console.status("Installing...") as live:
-            venv_dir = install_dir / "app" / ".venv"
-            log.info(f"Creating virtual environment at %s", venv_dir)
-            venv.create(
-                venv_dir,
-                symlinks=PLATFORM is not Platform.WINDOWS,
-                with_pip=True,
-                upgrade_deps=True,
-            )
+        console.status("Installing...")
+        venv_dir = install_dir / "app" / ".venv"
+        log.info(f"Creating virtual environment at %s", venv_dir)
+        venv.create(
+            venv_dir,
+            symlinks=PLATFORM is not Platform.WINDOWS,
+            with_pip=True,
+            upgrade_deps=True,
+        )
 
-            if (venv_dir / "bin").exists():
-                venv_py = venv_dir / "bin" / "python"
-            elif (venv_dir / "Scripts").exists():
-                venv_py = venv_dir / "Scripts" / "python.exe"
-            else:
-                console.exit(f"[error]No python executable found inside [path]{venv_dir}{os.path.sep}")
-            log.debug("Venv python: %s", venv_py.relative_to(venv_dir))
+        if (venv_dir / "bin").exists():
+            venv_py = venv_dir / "bin" / "python"
+        elif (venv_dir / "Scripts").exists():
+            venv_py = venv_dir / "Scripts" / "python.exe"
+        else:
+            console.exit(f"[error]No python executable found inside [path]{venv_dir}{os.path.sep}")
+        log.debug("Venv python: %s", venv_py.relative_to(venv_dir))  # noqa
 
-            log.info("Installing dependencies...")
-            log.debug(md.dependencies)
-            show_pip_output = args.log <= logging.INFO
-            if show_pip_output:
-                live.update("")  # Clear live before subprocess output ruins it.
-            subprocess.check_call(
-                [str(venv_py), "-m", "pip", "install", *md.dependencies],
-                stdout=None if show_pip_output else subprocess.DEVNULL,
-            )
+        log.info("Installing dependencies...")
+        log.debug(md.dependencies)
+        show_pip_output = args.log <= logging.INFO
+        if show_pip_output:
+            console.status("")  # Clear live before subprocess output ruins it.
+        subprocess.check_call(
+            [str(venv_py), "-m", "pip", "install", *md.dependencies],
+            stdout=None if show_pip_output else subprocess.DEVNULL,
+        )
     else:
         log.debug("No dependencies to install.")
 
-    # Continue installation.
-    with console.status("Finishing up..."):
-        # Create entry points.
-        log.info("Creating entry points...")
+    # Create entry points.
+    console.status("Creating entry points...")
+    log.info("Creating entry points...")
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)

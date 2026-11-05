@@ -1,5 +1,4 @@
 import logging
-from contextlib import contextmanager
 import sys
 from pathlib import Path
 import atexit
@@ -95,14 +94,16 @@ class Live:
 
 class Console:
     """Console object for easy terminal styles."""
-    def __init__(self, file=None, interactive: bool | None = None):
-        """If ``file`` is ``None``, default to ``sys.stdout``."""
+    def __init__(self, file=sys.stdout):
         self.file = file
-        self.colorized = can_colorize(file)
-        self.interactive = can_interact(file) if interactive is None else interactive
+        self.colorized, self.interactive = can_colorize(file), can_interact(file)
         self.theme = Theme() if self.colorized else Theme.no_colors()
+        # Live object for status display.
         self.live = Live(self)
-        atexit.register(self.progress)
+        # Terminal progress display via OSC 9;4.
+        # Set to `indeterminate` and clear on interpreter exit.
+        self._term_progress(3)
+        atexit.register(self._end_progress)
 
     def __str__(self) -> str:
         return (f"[name]{self.__class__.__name__}[/][brace]([/]"
@@ -110,14 +111,25 @@ class Console:
                 f"[attr]interactive[/]={prepr(self.interactive)}"
                 f"[brace])[/]")
 
+    # ANSI methods.
+
     def link(self, text, link: str | None = None):
         if not self.colorized:
             return text
         return f"\x1b]8;;{text if link is None else link}\x1b\\{text}\x1b]8;;\x1b\\"
 
-    def progress(self, state: int = 0, percent: int = 0):
+    def _term_progress(self, state: int = 0, percent: int = 0):
         if self.interactive:
             self.print(f"\x1b]9;4;{state};{percent}\x1b\\", end="")
+
+    def status(self, text: str):
+        self.live.update(STATUS_SPINNER + text)
+
+    def _end_progress(self):
+        self._term_progress(0)
+        self.live.update("")
+
+    # Logging methods.
 
     def write(self, value):
         with self.live:
@@ -126,38 +138,18 @@ class Console:
     def flush(self):
         return self.file.flush()
 
-    @contextmanager
-    def status(self, text, transient: bool = True):
-        self.live.update(STATUS_SPINNER + text)
-        try:
-            yield self.live
-        finally:
-            self.live.end(transient)
-            self.live.update("")
-
     def get_logging_handler(self):
         handler = logging.StreamHandler(self)
         handler.setFormatter(ThemeFormatter(self.theme))
         return handler
+
+    # Output methods.
 
     def print(self, *values, sep: str = " ", end: str = "\n"):
         """Prints ``values`` styled with rich-like markup."""
         value = sep.join(v if isinstance(v, str) else prepr(v) for v in values)
         with self.live:
             print(self.theme.style(value), end=end, file=self.file)
-
-    def input(self, prompt: str, default: str = "") -> str:
-        if not self.interactive:
-            return default
-        self.print(prompt, end="")
-        text = self.live.text
-        self.live.update("")
-        result = input() or default
-        self.live.update(text)
-        return result
-
-    def confirm(self, prompt: str, default: bool = False) -> bool:
-        return self.input(prompt + (CONFIRM_YES if default else CONFIRM_NO), "ny"[default]).lower() == "y"
 
     def exit(self, *messages, code: int = 1, exc: bool | None = None):
         """Log and print a styled message, then raise ``SystemExit(code)``."""
@@ -166,6 +158,21 @@ class Console:
             log.critical(f"[error]Exiting with code {code}", exc_info=pass_exc)
         self.print(*messages)
         raise SystemExit(code)
+
+    # Input methods.
+
+    def input(self, prompt: str, default: str = "") -> str:
+        if not self.interactive:
+            return default
+        text = self.live.text
+        self.live.update("")
+        self.print(prompt, end="")
+        result = input() or default
+        self.live.update(text)
+        return result
+
+    def confirm(self, prompt: str, default: bool = False) -> bool:
+        return self.input(prompt + (CONFIRM_YES if default else CONFIRM_NO), "ny"[default]).lower() == "y"
 
     def ask_folder(self, message: str, default: Path) -> Path | None:
         """If not interactive, default is returned. Otherwise, None means cancel."""

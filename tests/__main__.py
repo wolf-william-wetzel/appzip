@@ -5,18 +5,9 @@ import os
 from contextlib import chdir
 import sys
 
-NEW_ENV: dict[str, str] = {
-    "DEBUG": "1",  # Ensure debug for maximum output.
-    "TTY_INTERACTIVE": "0",  # No user input.
-}
-QUIET_ENV: dict[str, str] = {
-    "TTY_INTERACTIVE": "0",  # No user input.
-}
-KWARGS = {
-    "env": os.environ | NEW_ENV,
-}
-QUIET_KWARGS = {
-    "env": os.environ | QUIET_ENV,
+DEFAULT_ENV = os.environ | {
+    "DEBUG": "1",
+    "TTY_INTERACTIVE": "0",
 }
 # The commands to be run.
 EXE = ["uv", "run"]
@@ -34,10 +25,10 @@ COMMANDS = {
 DEFAULT = "pack"
 
 
-def run_commands(commands: list[list[str] | str], kwargs: dict | None = None) -> int:
+def run_commands(commands: list[list[str] | str], **kwargs: dict) -> int:
     """Run ``commands``, returning early if any fail."""
     for command in commands:
-        if code := subprocess.run(command, **(kwargs if kwargs else {})).returncode:
+        if code := subprocess.run(command, **kwargs).returncode:
             return code
     return 0
 
@@ -45,10 +36,17 @@ def run_commands(commands: list[list[str] | str], kwargs: dict | None = None) ->
 def main():
     if (cmds := COMMANDS.get(DEFAULT if len(sys.argv) < 2 else sys.argv[1])) is None:
         raise SystemExit(
-            f"Usage: python3 {sys.argv[0]} [{"|".join(COMMANDS.keys())}] (default: {DEFAULT}) [-q/--quiet]"
+            f"Usage: python3 {sys.argv[0]} [{"|".join(COMMANDS.keys())}] (default: {DEFAULT}) [-q] [-i]"
         )
     with chdir(os.path.dirname(__file__)):
-        raise SystemExit(run_commands(cmds, QUIET_KWARGS if sys.argv[-1] in ("-q", "--quiet") else KWARGS))
+        env = {}
+        if len(sys.argv) > 2:
+            options = sys.argv[2].removeprefix("-")
+            if "q" in options:
+                env |= {"DEBUG": ""}
+            if "i" in options:
+                env |= {"TTY_INTERACTIVE": "1"}
+        raise SystemExit(run_commands(cmds, env=DEFAULT_ENV | env))
 
 
 # uv run tests [test]
