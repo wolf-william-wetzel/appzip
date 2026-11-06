@@ -2,12 +2,12 @@ import os
 import sys
 import logging
 from pathlib import Path, UnsupportedOperation
-import subprocess
 from zipfile import ZipFile
 import stat
 import shutil
 
 __all__ = [
+    "InstallerExit",
     "Platform",
     "getenv",
     "LOG_LEVEL",
@@ -18,8 +18,12 @@ __all__ = [
     "can_colorize",
     "extract_subdir",
     "get_venv_py",
-    "venv_install",
 ]
+
+
+class InstallerExit(Exception):
+    """Exit installer with exit code 0."""
+
 
 log = logging.getLogger(__name__)
 
@@ -146,17 +150,10 @@ def extract_subdir(zf: ZipFile, subdir: str, dest: Path) -> None:
             log.exception(f"Cannot create symlink: %s -> %s{win}", path, target)
 
 
-def get_venv_py(venv_dir: Path, windowed: bool = False) -> Path:
+def get_venv_py(venv_dir: Path, windowed: bool = False) -> str:
     """Get the path to the python executable for ``venv_dir``."""
     py_name = f"python{"w" if windowed else ""}.exe" if Platform.IS_WIN else "python"
     path = venv_dir / ("Scripts" if Platform.IS_WIN else "bin") / py_name
     if path.exists():
-        return path
+        return str(path)
     raise FileNotFoundError(f"[error]no {py_name} found in {venv_dir}")
-
-
-def venv_install(venv_dir: Path, dependencies: list[str], show_output: bool = False):
-    """Install ``dependencies`` into ``venv_dir``."""
-    args = [str(get_venv_py(venv_dir)), "-m", "pip", "install", *dependencies]
-    log.debug("[l_yellow]{0} [d][fg]{1} [nd]{2} {3} [green]{4}[/]".format(*args[:4], " ".join(args[4:])))
-    subprocess.check_call(args, stdout=None if show_output else subprocess.DEVNULL, stderr=subprocess.STDOUT)

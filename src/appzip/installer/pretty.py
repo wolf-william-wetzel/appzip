@@ -14,6 +14,18 @@ INDENT = 2
 TIMESTAMP_TEMPLATE = "[timestamp]{0}-{1}-{2} {3:0>2}:{4:0>2}:{5:0>2}[/]"
 
 
+def prepr_command(args: list[str]) -> str:
+    command = ""
+    for i, arg in enumerate(args):
+        style = ""
+        if arg.startswith("-"):
+            style = "[d]"
+        if i == 0:
+            style = "[l_yellow]"
+        command += f"{"" if i == 0 else " "}{style}{arg}{"[/]" if style else ""}"
+    return command
+
+
 class Char:
     INDENT = "[indent]\u2502[/]"
     TREE_TRUNK = "[tree]\u2502[/]"
