@@ -5,6 +5,7 @@ from pathlib import Path, UnsupportedOperation
 import subprocess
 from zipfile import ZipFile
 import stat
+import shutil
 
 __all__ = [
     "Platform",
@@ -12,6 +13,7 @@ __all__ = [
     "LOG_LEVEL",
     "LOG_LEVELS",
     "is_term",
+    "rmtree",
     "can_interact",
     "can_colorize",
     "extract_subdir",
@@ -51,6 +53,13 @@ LOG_LEVEL = (getenv("LOGLEVEL") or getenv("LOG_LEVEL")).upper()
 LOG_LEVEL = {"CRITICAL": "FATAL", "WARNING": "WARN"}.get(LOG_LEVEL, LOG_LEVEL)
 if LOG_LEVEL not in LOG_LEVELS:
     LOG_LEVEL = "DEBUG" if getenv("DEBUG") else "WARN"
+
+
+def rmtree(path: Path):
+    errors: list[tuple[str, BaseException]] = []
+    shutil.rmtree(path, onexc=lambda _, p, e: errors.append((p, e)))
+    if errors:
+        raise OSError("Couldn't remove the following file(s):\n" + "\n".join(f"{p} -> {e}" for p, e in errors))
 
 
 def is_term(file=None) -> bool:
@@ -143,7 +152,7 @@ def get_venv_py(venv_dir: Path, windowed: bool = False) -> Path:
     path = venv_dir / ("Scripts" if Platform.IS_WIN else "bin") / py_name
     if path.exists():
         return path
-    raise FileNotFoundError(f"no {py_name} found in {venv_dir}")
+    raise FileNotFoundError(f"[error]no {py_name} found in {venv_dir}")
 
 
 def venv_install(venv_dir: Path, dependencies: list[str], show_output: bool = False):

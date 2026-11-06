@@ -25,7 +25,7 @@ COMMANDS = {
 DEFAULT = "pack"
 
 
-def run_commands(commands: list[list[str] | str], **kwargs: dict) -> int:
+def run_commands(commands: list[list[str]], **kwargs: dict) -> int:
     """Run ``commands``, returning early if any fail."""
     for command in commands:
         if code := subprocess.run(command, **kwargs).returncode:
@@ -51,4 +51,7 @@ def main():
 
 # uv run tests [test]
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

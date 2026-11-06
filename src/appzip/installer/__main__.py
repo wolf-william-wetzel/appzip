@@ -6,7 +6,6 @@ import time
 import datetime as dt
 from pathlib import Path
 from zipfile import ZipFile
-from shutil import rmtree
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 import venv
 
@@ -16,6 +15,8 @@ from .folder import get_install_dir
 from .pretty import prepr
 from .utils import *
 
+log = logging.getLogger()
+
 START_TIME = time.perf_counter_ns()
 PYZ_PATH = Path(__file__).parent.parent
 ZF = ZipFile(PYZ_PATH)  # Doesn't need to be closed since we aren't writing.
@@ -23,6 +24,7 @@ VENV_NAME = ".venv"  # Name of installation venv.
 SUBPROCESS_LOG_LEVEL = logging.DEBUG
 
 console = Console(sys.stdout)
+ERR_STYLE = console.theme.error
 
 HELP = console.theme.style("""
 Install the bundled application.
@@ -69,15 +71,33 @@ parser.add_argument("-l", "--log",
                     )
 
 
+def end(exc, code: int = 1):
+    if code:
+        log.exception(f"{ERR_STYLE}Exception traceback:")
+        log.critical(f"{ERR_STYLE}Exiting with code {code}")
+    console.print(exc)
+    raise SystemExit(code)
+
+
 def main():
+    try:
+        install()
+    except Exception as exc:
+        end(exc)
+    except SystemExit as exc:
+        end(exc, code=0)
+    except KeyboardInterrupt:
+        console.print(f"{ERR_STYLE}Terminated by Ctrl+C")
+        raise SystemExit(1)
+
+
+def install():
     # Parse arguments.
     args = parser.parse_args()
     args.path = args.path.expanduser().resolve()
     args.log = LOG_LEVELS[args.log]
-    show_subprocess_output = args.log <= SUBPROCESS_LOG_LEVEL
 
     # Set up logging.
-    log = logging.getLogger()
     logging.basicConfig(level=args.log, handlers=[console.get_logging_handler()])
     log.debug(console)
     log.debug(args)
@@ -92,7 +112,7 @@ def main():
     py_hex_str = f"{md.minimum_python:0>8x}"
     major, minor = int(py_hex_str[:2], 16), int(py_hex_str[2:4], 16)
     if md.minimum_python > sys.hexversion:
-        console.exit(f"[error]Installer requires Python >={major}.{minor}, not {python_version()}")
+        raise ValueError(f"[error]Installer requires Python >={major}.{minor}, not {python_version()}")
     log.debug(f"Python [string]{python_version()}[/] >= [string]{major}.{minor}[/]")
 
     # Confirm the installation directory.
@@ -102,31 +122,25 @@ def main():
         if (result := console.ask_folder("Installation directory? ", args.path)) is not None:
             args.path = result
         else:
-            console.exit("[error]No directory selected. Installation canceled.")
+            raise SystemExit("[error]No installation directory selected. Installation canceled.")
     install_dir = args.path / md.folder_name
 
     # Create and verify the installation directory.
     try:
         install_dir.mkdir(parents=True)
-        install_dir = install_dir.resolve(strict=True)
     except FileExistsError:
         # The path exists and is a file, not a folder.
         if not install_dir.is_dir():
-            console.exit("Installation path is not a directory:", install_dir)
+            raise NotADirectoryError(f"Installation path is not a directory: {install_dir}")
         # The path exists, so this version of the app was installed previously.
         log.warning(f"{md.app_name} is already installed: %s", install_dir)
         if not args.reinstall and not console.confirm("Overwrite previous installation?"):
-            console.exit("Exiting installer...", code=0)
+            raise SystemExit("[error]Installation canceled.")
         # Overwrite the previous installation.
         log.warning(f"Overwriting previous installation of {md.app_name}")
-        errors: list[tuple[str, BaseException]] = []
-        rmtree(install_dir, onexc=lambda _, p, e: errors.append((p, e)))
-        if errors:
-            console.exit("\n".join(f"{p}: {e}" for p, e in errors), exc=False)
+        rmtree(install_dir)
         install_dir.mkdir(parents=True)
-        install_dir = install_dir.resolve(strict=True)
-    except OSError:
-        console.exit("Installation path contains symlink loops:", install_dir)
+    install_dir = install_dir.resolve(strict=True)
     log.info(f"Installing {md.app_name} to %s", install_dir)
 
     # Install the app.
@@ -143,11 +157,9 @@ def main():
         venv.create(venv_dir, symlinks=not Platform.IS_WIN, with_pip=True, upgrade_deps=True)
 
         # Install dependencies.
+        show_subprocess_output = args.log <= SUBPROCESS_LOG_LEVEL
         console.status("" if show_subprocess_output else "Installing dependencies...")
-        try:
-            venv_install(venv_dir, md.dependencies, show_subprocess_output)
-        except FileNotFoundError as exc:
-            console.exit(f"[error]{exc}")
+        venv_install(venv_dir, md.dependencies, show_subprocess_output)
     else:
         log.debug("No dependencies to install.")
 

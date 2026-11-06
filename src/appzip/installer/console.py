@@ -155,14 +155,6 @@ class Console:
         with self.live:
             print(self.theme.style(value), end=end, file=self.file)
 
-    def exit(self, *messages, code: int = 1, exc: bool | None = None):
-        """Log and print a styled message, then raise ``SystemExit(code)``."""
-        if code:
-            pass_exc = sys.exc_info()[0] is not None if exc is None else exc
-            log.critical(f"[error]Exiting with code {code}", exc_info=pass_exc)
-        self.print(*messages)
-        raise SystemExit(code)
-
     # Input methods.
 
     def input(self, prompt: str, default: str = "") -> str:
