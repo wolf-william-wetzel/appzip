@@ -15,19 +15,24 @@ from .folder import get_install_dir
 from .pretty import prepr
 from .utils import *
 
-log = logging.getLogger()
-
 START_TIME = time.perf_counter_ns()
+
+console = Console(sys.stdout)
+
+log = logging.getLogger()
+logging.basicConfig(level=logging.WARNING, handlers=[console.get_logging_handler()])
+
 PYZ_PATH = Path(__file__).parent.parent
 ZF = ZipFile(PYZ_PATH)  # Doesn't need to be closed since we aren't writing.
+md = Metadata.from_json(ZF.read("metadata.json"))
 VENV_NAME = ".venv"  # Name of installation venv.
 SUBPROCESS_LOG_LEVEL = logging.DEBUG
 
-console = Console(sys.stdout)
-ERR_STYLE = console.theme.error
-
-HELP = console.theme.style("""
-Install the bundled application.
+INVALID_PY = "" if md.python_valid else f"""
+{md.app_name} [error]requires Python >={md.min_python_str}, but is running on Python {python_version()}[/]\
+"""
+HELP = console.theme.style(f"""
+Install the bundled application.{INVALID_PY}
 
 [header]examples:[/]
 Install at default location with verbose output:
@@ -73,47 +78,40 @@ parser.add_argument("-l", "--log",
 
 def end(exc, code: int = 1):
     if code:
-        log.exception(f"{ERR_STYLE}Exception traceback:")
-        log.critical(f"{ERR_STYLE}Exiting with code {code}")
+        log.exception("[error]Exception traceback:")
+        log.critical(f"[error]Exiting with code {code}")
     console.print(exc)
     raise SystemExit(code)
 
 
 def main():
+    # Parse the arguments.
+    args = parser.parse_args()
+    args.path = args.path.expanduser().resolve()
+    args.show_subprocess = LOG_LEVELS[args.log] <= SUBPROCESS_LOG_LEVEL
+
+    # Run the installer.
     try:
-        install()
+        install(args)
     except Exception as exc:
         end(exc)
     except SystemExit as exc:
         end(exc, code=0)
     except KeyboardInterrupt:
-        console.print(f"{ERR_STYLE}Terminated by Ctrl+C")
+        console.print("[error]Terminated by Ctrl+C")
         raise SystemExit(1)
 
 
-def install():
-    # Parse arguments.
-    args = parser.parse_args()
-    args.path = args.path.expanduser().resolve()
-    args.log = LOG_LEVELS[args.log]
+def install(args):
+    # Check if python is valid.
+    if not md.python_valid:
+        raise RuntimeError(f"[error]Installer requires Python >={md.min_python_str}, not {python_version()}")
 
     # Set up logging.
-    logging.basicConfig(level=args.log, handlers=[console.get_logging_handler()])
+    log.setLevel(args.log)
     log.debug(console)
     log.debug(args)
-
-    # Load metadata.
-    console.status("Loading metadata...")
-    md = Metadata.from_json(ZF.read("metadata.json"))
     log.debug(md)
-
-    # Verify proper python version.
-    console.status("Checking python version...")
-    py_hex_str = f"{md.minimum_python:0>8x}"
-    major, minor = int(py_hex_str[:2], 16), int(py_hex_str[2:4], 16)
-    if md.minimum_python > sys.hexversion:
-        raise ValueError(f"[error]Installer requires Python >={major}.{minor}, not {python_version()}")
-    log.debug(f"Python [string]{python_version()}[/] >= [string]{major}.{minor}[/]")
 
     # Confirm the installation directory.
     if not console.confirm(
@@ -157,9 +155,8 @@ def install():
         venv.create(venv_dir, symlinks=not Platform.IS_WIN, with_pip=True, upgrade_deps=True)
 
         # Install dependencies.
-        show_subprocess_output = args.log <= SUBPROCESS_LOG_LEVEL
-        console.status("" if show_subprocess_output else "Installing dependencies...")
-        venv_install(venv_dir, md.dependencies, show_subprocess_output)
+        console.status("" if args.show_subprocess else "Installing dependencies...")
+        venv_install(venv_dir, md.dependencies, args.show_subprocess)
     else:
         log.debug("No dependencies to install.")
 

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import json
+from sys import hexversion
 
 
 @dataclass
@@ -30,11 +31,16 @@ class Metadata:
     entry_points: list[EntryPoint]
     folder_name: str = ""
     app_name: str = ""
+    python_valid: bool = True
+    min_python_str: str = ""
 
     def __post_init__(self):
         self.folder_name = f"{self.name}_{self.version}" if self.version else self.name
         app_name = f"[app]{self.name}[/]"
         self.app_name = f"{app_name} [version]{self.version}[/]" if self.version else app_name
+        self.python_valid = self.minimum_python <= hexversion
+        py_hex_str = f"{self.minimum_python:0>8x}"
+        self.min_python_str = f"{int(py_hex_str[:2], 16)}.{int(py_hex_str[2:4], 16)}"
 
     @staticmethod
     def _json_object_hook(obj: dict):
