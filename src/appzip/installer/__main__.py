@@ -24,6 +24,7 @@ ZF = ZipFile(PYZ_PATH)  # Doesn't need to be closed since we aren't writing.
 md = Metadata.from_json(ZF.read("metadata.json"))
 VENV_NAME = ".venv"  # Name of installation venv.
 DATA_DIR_NAME = "app/"  # Name of data directory in installation directory.
+FLAG_FILE = DATA_DIR_NAME + "install.flag"  # Flag file to mark successful installations.
 
 INVALID_PY = "" if md.python_valid else f"""
 {md.app_name} [error]requires Python >={md.min_python_str}, but is running on Python {python_version()}[/]\
@@ -132,10 +133,14 @@ def install():
         # The path exists and is a file, not a folder.
         if not install_dir.is_dir():
             raise NotADirectoryError(f"Installation path is not a directory: {install_dir}")
-        # The path exists, so this version of the app was installed previously.
-        log.warning(f"{md.app_name} is already installed: %s", install_dir)
-        if not args.reinstall and not console.confirm("Overwrite previous installation?"):
-            raise InstallerExit("Installation canceled.")
+        # Check for incomplete installation.
+        if (install_dir / FLAG_FILE).exists():
+            # The path exists, so this version of the app was installed previously.
+            log.warning(f"{md.app_name} is already installed: %s", install_dir)
+            if not args.reinstall and not console.confirm("Overwrite previous installation?"):
+                raise InstallerExit("Installation canceled.")
+        else:
+            log.warning("Incomplete installation found.")
         # Overwrite the previous installation.
         log.warning(f"Overwriting previous installation of {md.app_name}")
         console.status("Removing previous installation...")
@@ -171,6 +176,10 @@ def install():
         name = f"{ep.name}.py{"w" if ep.windowed and Platform.IS_WIN else ""}"
         log.debug(f"Creating entry point [{"l_blue" if ep.windowed else "l_green"}]{name}")
         make_ep_file(install_dir / name, ep.get_file_text(venv_dir, app_dir / md.base_name))
+
+    # Flag the installation as finished.
+    log.debug("Writing flag file to %s", install_dir / FLAG_FILE)
+    (install_dir / FLAG_FILE).touch()
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)

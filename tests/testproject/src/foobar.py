@@ -1,1 +1,1 @@
-pass
+print("Executed foobar.py")

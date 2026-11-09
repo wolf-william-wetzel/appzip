@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 import json
-from sys import hexversion
+import sys
 
 from .utils import get_python
 
 
 EP_TEMPLATE = """#!{interpreter}
-import subprocess
-subprocess.run([{interpreter!r}, {script}], cwd={cwd!r})"""
+import subprocess, os
+subprocess.run([{interpreter!r}, {script}], cwd={cwd!r}, env=os.environ | dict(PYTHONSAFEPATH=""))"""
 EP_ATTR_TEMPLATE = "'-c', 'import {mod};{mod}.{fn}()'"
 
 
@@ -50,7 +50,7 @@ class Metadata:
         self.folder_name = f"{self.name}_{self.version}" if self.version else self.name
         app_name = f"[app]{self.name}[/]"
         self.app_name = f"{app_name} [version]{self.version}[/]" if self.version else app_name
-        self.python_valid = self.minimum_python <= hexversion
+        self.python_valid = self.minimum_python <= sys.hexversion
         py_hex_str = f"{self.minimum_python:0>8x}"
         self.min_python_str = f"{int(py_hex_str[:2], 16)}.{int(py_hex_str[2:4], 16)}"
 
