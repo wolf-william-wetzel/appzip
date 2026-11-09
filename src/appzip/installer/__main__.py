@@ -23,6 +23,7 @@ PYZ_PATH = Path(__file__).parent.parent
 ZF = ZipFile(PYZ_PATH)  # Doesn't need to be closed since we aren't writing.
 md = Metadata.from_json(ZF.read("metadata.json"))
 VENV_NAME = ".venv"  # Name of installation venv.
+DATA_DIR_NAME = "app/"  # Name of data directory in installation directory.
 
 INVALID_PY = "" if md.python_valid else f"""
 {md.app_name} [error]requires Python >={md.min_python_str}, but is running on Python {python_version()}[/]\
@@ -77,7 +78,7 @@ parser.add_argument("-l", "--log",
 # Parse the arguments.
 args = parser.parse_args()
 args.path = args.path.expanduser().resolve()
-SHOW_SUBPROC = LOG_LEVELS[args.log] <= logging.DEBUG
+SHOW_SUBPROCESS = LOG_LEVELS[args.log] <= logging.DEBUG
 
 log = logging.getLogger()
 logging.basicConfig(level=args.log, handlers=[console.get_logging_handler()])
@@ -142,29 +143,39 @@ def install():
         install_dir.mkdir(parents=True)
     install_dir = install_dir.resolve(strict=True)
     log.info(f"Installing {md.app_name} to %s", install_dir)
+    app_dir = install_dir / DATA_DIR_NAME
 
     # Install the app.
     console.status("Extracting...")
-    extract_subdir(ZF, "app/", install_dir)
+    extract_subdir(ZF, DATA_DIR_NAME, install_dir)
 
     # Install dependencies.
     if md.dependencies:
-        venv_dir = install_dir / "app" / VENV_NAME
+        venv_dir = app_dir / VENV_NAME
         log.debug("Venv: %s", venv_dir)
 
         # Create venv.
         console.status(f"Creating virtual environment...")
         venv.create(venv_dir, symlinks=not Platform.IS_WIN, with_pip=True, upgrade_deps=True)
+        py_exe = get_venv_py(venv_dir)
+        pyw_exe = get_venv_py(venv_dir, True)
 
         # Install dependencies.
         console.status("Installing dependencies...")
-        console.call_subprocess([get_venv_py(venv_dir),"-m","pip","install",*md.dependencies], SHOW_SUBPROC)
+        console.call_subprocess([py_exe, "-m", "pip", "install", *md.dependencies], SHOW_SUBPROCESS)
     else:
         log.debug("No dependencies to install.")
+        if not sys.executable:
+            raise FileNotFoundError("Path to python binary not found.")
+        py_exe = get_sys_py()
+        pyw_exe = get_sys_py(True)
 
     # Create entry points.
     console.status("Creating entry points...")
-    pass
+    for ep in md.entry_points:
+        name = f"{ep.name}.py{"w" if ep.windowed and Platform.IS_WIN else ""}"
+        log.debug(f"Creating entry point [{"l_blue" if ep.windowed else "l_green"}]{name}")
+        make_ep_file(install_dir / name, ep.get_file_text(py_exe, pyw_exe, app_dir / md.base_name))
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)

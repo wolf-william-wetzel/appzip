@@ -3,22 +3,32 @@ import json
 from sys import hexversion
 
 
+EP_TEMPLATE = """#!{interpreter}
+import subprocess
+subprocess.run([{interpreter!r}, {script}], cwd={cwd!r})"""
+EP_ATTR_TEMPLATE = "'-c', 'import {mod};{mod}.{fn}()'"
+
+
 @dataclass
 class EntryPoint:
     name: str
     value: str
     group: str
-    module: str = ""
+    module: str
     attr: str = ""
     console: bool = False
     app: bool = False
     windowed: bool = False
 
     def __post_init__(self):
-        self.module, _, self.attr = self.value.partition(":")
         self.console = self.group.startswith("appzip.ep.console")
         self.app = self.group.startswith("appzip.ep.app")
         self.windowed = self.group.endswith(".w")
+
+    def get_file_text(self, py_exe: str, pyw_exe: str, cwd) -> str:
+        exe = pyw_exe if self.windowed else py_exe
+        script = EP_ATTR_TEMPLATE.format(mod=self.module, fn=self.attr) if self.attr else repr(self.module)
+        return EP_TEMPLATE.format(interpreter=exe, script=script, cwd=str(cwd))
 
 
 @dataclass
@@ -29,6 +39,7 @@ class Metadata:
     minimum_python: int
     dependencies: list[str]
     entry_points: list[EntryPoint]
+    base_name: str
     folder_name: str = ""
     app_name: str = ""
     python_valid: bool = True
@@ -44,7 +55,7 @@ class Metadata:
 
     @staticmethod
     def _json_object_hook(obj: dict):
-        if obj.keys() == {"name", "value", "group"}:
+        if {"name", "value", "group"} <= obj.keys():
             return EntryPoint(**obj)
         return obj
 

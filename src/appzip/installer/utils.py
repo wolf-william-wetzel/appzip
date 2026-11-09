@@ -17,6 +17,8 @@ __all__ = [
     "can_interact",
     "can_colorize",
     "extract_subdir",
+    "make_ep_file",
+    "get_sys_py",
     "get_venv_py",
 ]
 
@@ -148,6 +150,23 @@ def extract_subdir(zf: ZipFile, subdir: str, dest: Path) -> None:
             if Platform.IS_WIN:
                 win = "\nTry running as administrator or activating Windows Developer Mode."
             log.exception(f"Cannot create symlink: %s -> %s{win}", path, target)
+
+
+def make_ep_file(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` and make it executable."""
+    with open(path, "w") as f:
+        f.write(text)
+    path.chmod(path.stat().st_mode | stat.S_IEXEC)
+
+
+def get_sys_py(windowed: bool = False) -> str:
+    if not sys.executable:
+        raise RuntimeError("No system python found.")
+    if windowed and Platform.IS_WIN:
+        path = Path(sys.executable).parent / "pythonw.exe"
+        if path.exists():
+            return str(path)
+    return sys.executable
 
 
 def get_venv_py(venv_dir: Path, windowed: bool = False) -> str:

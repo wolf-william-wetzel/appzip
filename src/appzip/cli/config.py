@@ -3,6 +3,7 @@ from annotationlib import get_annotations
 from platform import python_version_tuple
 from dataclasses import dataclass, replace
 import os
+from keyword import iskeyword
 
 from msgspec import Struct, field, toml
 from packaging.specifiers import SpecifierSet
@@ -20,11 +21,34 @@ CONFIG_NAMES = (
 )
 
 
+def dot_string_is_valid(string: str) -> bool:
+    return all(s.isidentifier() and not iskeyword(s) for s in string.split("."))
+
+
 @dataclass
 class EntryPoint:
     name: str
     value: str
     group: str
+    module: str = ""
+    attr: str = ""
+
+    def __post_init__(self):
+        self.module, _, self.attr = self.value.partition(":")
+        # Filepath entry point.
+        if not self.attr:
+            return
+        # Function call entry point.
+        if not dot_string_is_valid(self.module) or not dot_string_is_valid(self.attr):
+            raise ValidationError(f"Invalid entry point: {self.value}")
+
+    def validate_path(self, base_dir: Path):
+        # Function call entry point.
+        if self.attr:
+            return
+        # Filepath entry point.
+        if not (base_dir / self.module).exists():
+            raise ValidationError(f"Missing entry point: {Format.path(base_dir)}{self.value}")
 
     def with_group(self, group: str):
         """Return an identical ``EntryPoint`` but with ``group``."""
@@ -100,7 +124,7 @@ class Base(Struct, frozen=True, rename="kebab"):
     pass
 
 
-class Project(Base):
+class Project(Base, frozen=True):
     name: str = field(default_factory=lambda: BaseDirPath.base.name)
     version: str = ""
     description: str = ""
@@ -111,7 +135,7 @@ class Project(Base):
     entry_points: EntryPoints = EntryPoints()
 
 
-class Appzip(Base):
+class Appzip(Base, frozen=True):
     version: str | None = None
     base_dir: BaseDirPath = field(default_factory=lambda: BaseDirPath.validate("."))
     build_dir: DirPath = field(default_factory=lambda: DirPath.validate("build"))
@@ -120,11 +144,11 @@ class Appzip(Base):
     exclude: tuple[str, ...] = ("build", "dist")
 
 
-class Tool(Base):
+class Tool(Base, frozen=True):
     appzip: Appzip = field(default_factory=Appzip)
 
 
-class ConfigFile(Base):
+class ConfigFile(Base, frozen=True):
     """Represents the entire configuration file."""
     # Any table with a default that relies on base dir needs to be lazily loaded via default_factory.
     project: Project = field(default_factory=Project)
@@ -140,7 +164,6 @@ class GenConfig:
     dest_dir: Path  # Subfolder of build_dir where files are copied.
     app_dir: Path  # Subfolder of dest_dir where app is stored.
     metadata_file: Path  # Filename of metadata file inside dest_dir.
-    entry_point: Path  # Filename of installer entry point inside dest_dir.
     minimum_python: int  # Minimum python hex version for the app.
     extra_deps: tuple[Requirement, ...]  # Extra dependencies loaded from dependency groups.
 
@@ -179,21 +202,23 @@ class Config(GenConfig):
                 self.entry_points.extend(ep.with_group("appzip.ep.app.w") for ep in self.gui_scripts)
             # Use __main__.py as an entry point.
             elif (self.base_dir / "__main__.py").exists():
-                self.entry_points.append(EntryPoint(self.name, self.base_dir.name, "appzip.ep.app"))
+                self.entry_points.append(EntryPoint(self.name, "__main__.py", "appzip.ep.app"))
             # Use __main__.pyw as an entry point.
             elif (self.base_dir / "__main__.pyw").exists():
-                self.entry_points.append(EntryPoint(self.name, self.base_dir.name, "appzip.ep.app.w"))
+                self.entry_points.append(EntryPoint(self.name, "__main__.pyw", "appzip.ep.app.w"))
             # No entry points found.
             else:
                 missing = "__main__.py[w]" if self.path.is_dir() else "entry points"
                 raise ValidationError(f"No {missing} found in {Format.path(self.path)}")
+        # Validate filepath entry points.
+        for ep in self.entry_points:
+            ep.validate_path(self.base_dir)
         # Calculate generated values.
         self.log_file = self.build_dir / "build.log"
         self.installer_path = self.dist_dir / f"{self.name}{f"_{v}" if (v := self.version) else ""}_installer.pyz"
         self.dest_dir = self.build_dir / self.installer_path.stem
         self.app_dir = self.dest_dir / "app" / self.base_dir.name
         self.metadata_file = self.dest_dir / "metadata.json"
-        self.entry_point = self.dest_dir / "__main__.py"
         major = int(PY_VER[0])
         if not (minor := next(self.requires_python.filter(range(14, 255), key=lambda i: f"{major}.{i}"), 0)):
             raise ValidationError(f"Minimum python version couldn't be determined from '{self.requires_python!s}'")

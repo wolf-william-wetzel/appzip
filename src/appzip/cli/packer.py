@@ -66,11 +66,15 @@ class Metadata(msgspec.Struct):
     minimum_python: int
     dependencies: list[Requirement]
     entry_points: EntryPoints
+    base_name: str
 
     @classmethod
     def from_config(cls, cfg: Config):
         """Initialize metadata from a ``Config`` object."""
-        return cls(**{k: getattr(cfg, k) for k in get_annotations(cls) if hasattr(cfg, k)})
+        return cls(
+            base_name=cfg.base_dir.name,
+            **{k: getattr(cfg, k) for k in get_annotations(cls) if hasattr(cfg, k)},
+        )
 
 
 def add_installer_resources(cfg: Config):

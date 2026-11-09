@@ -13,19 +13,19 @@ appzip = [
 ]
 
 [project.scripts]
-default = "testproject:main.main"
+default = "main:main"
 
 [project.gui-scripts]
-default_gui = "testproject:main.main"
+default_gui = "main:main"
 
 [project.entry-points."appzip.ep"]
-testapp = "testproject"
+testapp = "."
 
 [project.entry-points."appzip.ep.console"]
-testapp_console = "testproject"
+testapp_console = "main.py"
 
 [project.entry-points."appzip.ep.app.w"]
-testapp_gui = "testproject"
+testapp_gui = "main:main"
 
 [tool.appzip]
 exclude = ["build", "dist", "exclude.txt", "hidden"]
