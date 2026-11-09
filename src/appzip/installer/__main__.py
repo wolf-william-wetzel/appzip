@@ -150,6 +150,7 @@ def install():
     extract_subdir(ZF, DATA_DIR_NAME, install_dir)
 
     # Install dependencies.
+    venv_dir = None
     if md.dependencies:
         venv_dir = app_dir / VENV_NAME
         log.debug("Venv: %s", venv_dir)
@@ -157,21 +158,17 @@ def install():
         # Create venv.
         console.status(f"Creating virtual environment...")
         venv.create(venv_dir, symlinks=not Platform.IS_WIN, with_pip=True, upgrade_deps=True)
-        py_exe = get_venv_py(venv_dir)
-        pyw_exe = get_venv_py(venv_dir, True)
 
         # Install dependencies.
         console.status("Installing dependencies...")
-        console.call_subprocess([py_exe, "-m", "pip", "install", *md.dependencies], SHOW_SUBPROCESS)
+        console.call_subprocess([get_python(venv_dir),"-m","pip","install",*md.dependencies], SHOW_SUBPROCESS)
     else:
         log.debug("No dependencies to install.")
-        if not sys.executable:
-            raise FileNotFoundError("Path to python binary not found.")
-        py_exe = get_sys_py()
-        pyw_exe = get_sys_py(True)
 
     # Create entry points.
     console.status("Creating entry points...")
+    py_exe = get_python(venv_dir)
+    pyw_exe = get_python(venv_dir, True)
     for ep in md.entry_points:
         name = f"{ep.name}.py{"w" if ep.windowed and Platform.IS_WIN else ""}"
         log.debug(f"Creating entry point [{"l_blue" if ep.windowed else "l_green"}]{name}")

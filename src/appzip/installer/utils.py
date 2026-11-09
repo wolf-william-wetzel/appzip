@@ -5,6 +5,7 @@ from pathlib import Path, UnsupportedOperation
 from zipfile import ZipFile
 import stat
 import shutil
+from functools import cache
 
 __all__ = [
     "InstallerExit",
@@ -18,8 +19,7 @@ __all__ = [
     "can_colorize",
     "extract_subdir",
     "make_ep_file",
-    "get_sys_py",
-    "get_venv_py",
+    "get_python",
 ]
 
 
@@ -159,9 +159,15 @@ def make_ep_file(path: Path, text: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
+@cache
+def get_python(venv_dir: Path | None = None, windowed: bool = False) -> str:
+    """Return path to python executable as a string. Return system python if ``venv_dir`` is None."""
+    return get_sys_py(windowed) if venv_dir is None else get_venv_py(venv_dir, windowed)
+
+
 def get_sys_py(windowed: bool = False) -> str:
     if not sys.executable:
-        raise RuntimeError("No system python found.")
+        raise FileNotFoundError("Path to python binary not found.")
     if windowed and Platform.IS_WIN:
         path = Path(sys.executable).parent / "pythonw.exe"
         if path.exists():
