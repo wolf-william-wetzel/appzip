@@ -2,6 +2,8 @@ from dataclasses import dataclass
 import json
 from sys import hexversion
 
+from .utils import get_python
+
 
 EP_TEMPLATE = """#!{interpreter}
 import subprocess
@@ -25,10 +27,9 @@ class EntryPoint:
         self.app = self.group.startswith("appzip.ep.app")
         self.windowed = self.group.endswith(".w")
 
-    def get_file_text(self, py_exe: str, pyw_exe: str, cwd) -> str:
-        exe = pyw_exe if self.windowed else py_exe
+    def get_file_text(self, venv_dir, cwd) -> str:
         script = EP_ATTR_TEMPLATE.format(mod=self.module, fn=self.attr) if self.attr else repr(self.module)
-        return EP_TEMPLATE.format(interpreter=exe, script=script, cwd=str(cwd))
+        return EP_TEMPLATE.format(interpreter=get_python(venv_dir, self.windowed), script=script, cwd=str(cwd))
 
 
 @dataclass

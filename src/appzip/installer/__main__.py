@@ -167,12 +167,10 @@ def install():
 
     # Create entry points.
     console.status("Creating entry points...")
-    py_exe = get_python(venv_dir)
-    pyw_exe = get_python(venv_dir, True)
     for ep in md.entry_points:
         name = f"{ep.name}.py{"w" if ep.windowed and Platform.IS_WIN else ""}"
         log.debug(f"Creating entry point [{"l_blue" if ep.windowed else "l_green"}]{name}")
-        make_ep_file(install_dir / name, ep.get_file_text(py_exe, pyw_exe, app_dir / md.base_name))
+        make_ep_file(install_dir / name, ep.get_file_text(venv_dir, app_dir / md.base_name))
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)
