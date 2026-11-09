@@ -30,7 +30,9 @@ INVALID_PY = "" if md.python_valid else f"""
 {md.app_name} [error]requires Python >={md.min_python_str}, but is running on Python {python_version()}[/]\
 """
 HELP = console.theme.style(f"""
-Install the bundled application.{INVALID_PY}
+Install the bundled application.
+{md.app_name}
+{md.description}{INVALID_PY}
 
 [header]examples:[/]
 Install at default location with verbose output:
