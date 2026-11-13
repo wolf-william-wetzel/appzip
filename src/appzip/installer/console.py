@@ -62,6 +62,7 @@ class Console:
         self.file = file
         self.colorized, self.interactive = can_colorize(file), can_interact(file)
         self.theme = Theme() if self.colorized else Theme.no_colors()
+        self.subprocess_output = True
         # Text for status display.
         self.text = self.anti_text = ""
         # Terminal progress display via OSC 9;4.
@@ -135,10 +136,10 @@ class Console:
         with self:
             print(self.theme.style(value), end=end, file=self.file)
 
-    def call_subprocess(self, args: list, show_output: bool = False) -> None:
+    def call_subprocess(self, args: list) -> None:
         """Call a subprocess and show output without ruining the status display."""
         log.debug(prepr_command(args))
-        stdout = self.file if show_output else subprocess.DEVNULL
+        stdout = self.file if self.subprocess_output else subprocess.DEVNULL
         with self:
             subprocess.check_call(args, stdout=stdout, stderr=subprocess.STDOUT)
 

@@ -11,6 +11,7 @@ __all__ = [
     "InstallerExit",
     "Platform",
     "getenv",
+    "UV_EXE",
     "LOG_LEVEL",
     "LOG_LEVELS",
     "is_term",
@@ -49,6 +50,8 @@ def getenv(var: str, fallback: str = "") -> str:
     except Exception:  # noqa
         return fallback
 
+
+UV_EXE = shutil.which("uv")
 
 LOG_LEVELS = logging.getLevelNamesMapping()
 LOG_LEVELS.pop("CRITICAL")

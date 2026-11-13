@@ -1,8 +1,11 @@
 from pathlib import Path
 import os
 import subprocess
+import logging
 
-from .utils import Platform
+from .utils import Platform, getenv
+
+log = logging.getLogger(__name__)
 
 INSTALL_DIRS = ["~"]
 if Platform.IS_UNIX:
@@ -15,13 +18,30 @@ BIN_DIRS = ["${XDG_BIN_HOME}", "${XDG_DATA_HOME}/../bin", "~/.local/bin"]
 
 def _get_dir(dirs: list[str]) -> Path:
     for path in dirs:
-        try:
-            path = os.path.expanduser(os.path.expandvars(path))
-            assert path[0] not in "$~"
-        except RuntimeError, AssertionError:
+        path = os.path.expanduser(os.path.expandvars(path))
+        if path[0] in "$~":
             continue
-        return Path(path)
+        path = Path(path)
+        if path.exists() and not path.is_dir():
+            continue
+        return path.resolve()
     return Path.cwd()
+
+
+def _ensure_on_path(path: Path):
+    path_str = str(path)
+    sys_path = getenv("PATH")
+    # Windows-only.
+    if Platform.IS_WIN:
+        # Compare case-insensitively.
+        path_str, sys_path = path_str.lower(), sys_path.lower()
+        # Add to system path if needed.
+        if path_str not in sys_path:
+            proc = subprocess.run(f'setx PATH "%PATH%;{path}"', shell=True)
+            log.debug(proc)
+    # Warn if path not in system path.
+    if path_str not in sys_path:
+        log.warning("%s is not in system path", path)
 
 
 def get_install_dir() -> Path:
@@ -30,16 +50,6 @@ def get_install_dir() -> Path:
 
 def get_bin_dir() -> Path:
     path = _get_dir(BIN_DIRS)
-    # Create and resolve the path.
-    try:
-        path.mkdir(parents=True, exist_ok=True)
-        path = path.resolve(strict=True)
-    # Upon failure, default to cwd.
-    except OSError:
-        return Path.cwd()
-    # Add to path on Windows if needed.
-    if Platform.IS_WIN:
-        # Compare case-insensitively.
-        if str(path).lower() not in os.environ.get("PATH", "").lower():
-            subprocess.run(f'setx PATH "%PATH%;{str(path)}"', shell=True)
+    path.mkdir(parents=True, exist_ok=True)
+    _ensure_on_path(path)
     return path

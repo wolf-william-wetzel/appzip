@@ -81,7 +81,7 @@ parser.add_argument("-l", "--log",
 # Parse the arguments.
 args = parser.parse_args()
 args.path = args.path.expanduser().resolve()
-SHOW_SUBPROCESS = LOG_LEVELS[args.log] <= logging.DEBUG
+console.subprocess_output = LOG_LEVELS[args.log] <= logging.DEBUG
 
 log = logging.getLogger()
 logging.basicConfig(level=args.log, handlers=[console.get_logging_handler()])
@@ -164,11 +164,18 @@ def install():
 
         # Create venv.
         console.status(f"Creating virtual environment...")
-        venv.create(venv_dir, symlinks=not Platform.IS_WIN, with_pip=True, upgrade_deps=True)
+        if UV_EXE:
+            console.call_subprocess([UV_EXE, "venv", str(venv_dir)])
+        else:
+            venv.create(venv_dir, symlinks=not Platform.IS_WIN, with_pip=True, upgrade_deps=True)
 
         # Install dependencies.
         console.status("Installing dependencies...")
-        console.call_subprocess([get_python(venv_dir),"-m","pip","install",*md.dependencies], SHOW_SUBPROCESS)
+        venv_py = get_python(venv_dir)
+        if UV_EXE:
+            console.call_subprocess([UV_EXE, "pip", "install", "--python", venv_py, *md.dependencies])
+        else:
+            console.call_subprocess([venv_py, "-m", "pip", "install", *md.dependencies])
     else:
         log.debug("No dependencies to install.")
 
