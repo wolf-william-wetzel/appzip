@@ -87,6 +87,14 @@ def is_term(file=None) -> bool:
     if not hasattr(file, "fileno"):
         return False
 
+    if sys.platform == "win32":
+        try:
+            import nt
+            if not nt._supports_virtual_terminal():  # noqa
+                return False
+        except (ImportError, AttributeError):
+            return False
+
     try:
         return os.isatty(file.fileno())
     except OSError:
@@ -115,15 +123,6 @@ def can_colorize(file=None) -> bool:
         return False
     if getenv("FORCE_COLOR"):
         return True
-
-    if sys.platform == "win32":
-        try:
-            import nt
-            if not nt._supports_virtual_terminal():  # noqa
-                return False
-        except (ImportError, AttributeError):
-            return False
-
     return is_term(file)
 
 
