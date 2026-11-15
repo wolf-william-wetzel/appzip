@@ -52,11 +52,13 @@ def _get_windows_folder(name: str) -> str | None:
         # Get from subprocess.
         proc = subprocess.run(
             [
-                "powershell",
+                "powershell.exe",
                 "-NoLogo",
                 "-NonInteractive",
                 "-NoProfile",
-                "-C",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
                 f"[Environment]::GetFolderPath([Environment+SpecialFolder]::{name})",
             ],
             stdout=subprocess.PIPE,
@@ -75,7 +77,7 @@ def _get_xdg_user_dir(name: str) -> str | None:
     if XDG_USER_DIRS_FILE.exists():
         with open(XDG_USER_DIRS_FILE) as file:
             for line in file:
-                if name in line and "=" in line:
+                if line[0] != "#" and name in line and "=" in line:
                     return line.rpartition("=")[2].strip().strip("\"'")
     return None
 

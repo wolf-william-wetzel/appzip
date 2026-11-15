@@ -6,6 +6,7 @@ import sys
 def _main():
     # General info.
     print(f"Python: {sys.executable}")
+    print(f"Args: {sys.argv[1:]}")
     parent = Path(__file__).parent
     print(f"Parent dir: {parent}")
 

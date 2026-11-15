@@ -139,7 +139,8 @@ def install():
         if (install_dir / FLAG_FILE).exists():
             # The path exists, so this version of the app was installed previously.
             log.warning(f"{md.app_name} is already installed: %s", install_dir)
-            if not args.reinstall and not console.confirm("Overwrite previous installation?"):
+            args.reinstall = args.reinstall or console.confirm("Overwrite previous installation?")
+            if not args.reinstall:
                 raise InstallerExit("Installation canceled.")
         else:
             log.warning("Incomplete installation found.")
