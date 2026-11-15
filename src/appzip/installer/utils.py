@@ -22,6 +22,7 @@ __all__ = [
     "can_interact",
     "can_colorize",
     "extract_subdir",
+    "write_ep_script",
     "make_ep_file",
     "get_python",
 ]
@@ -65,6 +66,21 @@ LOG_LEVEL = (getenv("LOGLEVEL") or getenv("LOG_LEVEL")).upper()
 LOG_LEVEL = {"CRITICAL": "FATAL", "WARNING": "WARN"}.get(LOG_LEVEL, LOG_LEVEL)
 if LOG_LEVEL not in LOG_LEVELS:
     LOG_LEVEL = "DEBUG" if getenv("DEBUG") else "WARN"
+
+EP_SCRIPT_MARKER = "-s"
+EP_SCRIPT = """\
+#!{interpreter}
+import subprocess, os, sys
+if len(sys.argv) < 3:
+    raise SystemExit("need at least 2 args, only %%d provided" %% (len(sys.argv) - 1))
+args = [{interpreter!r}]
+if sys.argv[2] == "%s":
+    args.append(sys.argv[1])
+else:
+    args += ["-c", "import %%s;%%s.%%s()" %% (sys.argv[1], sys.argv[1], sys.argv[2])]
+proc = subprocess.run(args + sys.argv[3:], cwd={cwd!r}, env=os.environ | dict(PYTHONSAFEPATH=""))
+sys.exit(proc.returncode)
+""" % EP_SCRIPT_MARKER
 
 
 def run_pwsh_cmd(command: str) -> subprocess.CompletedProcess[str]:
@@ -179,6 +195,18 @@ def extract_subdir(zf: ZipFile, subdir: str, dest: Path) -> None:
             log.exception(f"Cannot create symlink: %s -> %s{win}", path, target)
 
 
+def write_ep_script(venv_dir: Path | None, app_dir: Path, cwd_name: str):
+    _write_ep_script(venv_dir, app_dir, cwd_name)
+    if Platform.IS_WIN:
+        _write_ep_script(venv_dir, app_dir, cwd_name, True)
+
+
+def _write_ep_script(venv_dir: Path | None, app_dir: Path, cwd_name: str, windowed: bool = False):
+    text = EP_SCRIPT.format(interpreter=get_python(venv_dir, windowed), cwd=app_dir / cwd_name)
+    with open(app_dir / f"ep{'w' if windowed else ''}", "w") as file:
+        file.write(text)
+
+
 def make_ep_file(path: Path, text: str) -> None:
     """Write ``text`` to ``path`` and make it executable."""
     with open(path, "w") as f:
@@ -189,10 +217,10 @@ def make_ep_file(path: Path, text: str) -> None:
 @cache
 def get_python(venv_dir: Path | None = None, windowed: bool = False) -> str:
     """Return path to python executable as a string. Return system python if ``venv_dir`` is None."""
-    return get_sys_py(windowed) if venv_dir is None else get_venv_py(venv_dir, windowed)
+    return _get_sys_py(windowed) if venv_dir is None else _get_venv_py(venv_dir, windowed)
 
 
-def get_sys_py(windowed: bool = False) -> str:
+def _get_sys_py(windowed: bool = False) -> str:
     if not sys.executable:
         raise FileNotFoundError("Path to python binary not found.")
     if windowed and Platform.IS_WIN:
@@ -202,7 +230,7 @@ def get_sys_py(windowed: bool = False) -> str:
     return sys.executable
 
 
-def get_venv_py(venv_dir: Path, windowed: bool = False) -> str:
+def _get_venv_py(venv_dir: Path, windowed: bool = False) -> str:
     """Get the path to the python executable for ``venv_dir``."""
     py_name = f"python{"w" if windowed else ""}.exe" if Platform.IS_WIN else "python"
     path = venv_dir / ("Scripts" if Platform.IS_WIN else "bin") / py_name

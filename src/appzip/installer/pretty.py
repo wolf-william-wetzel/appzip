@@ -26,6 +26,56 @@ def prepr_command(args: list[str]) -> str:
     return command
 
 
+def prepr_tree(path: Path, **kwargs) -> str:
+    if "sizes" not in kwargs:
+        kwargs |= {"sizes": _calculate_dir_sizes(path)}
+    name = _make_file_name(path, **kwargs)
+    if path.is_dir(follow_symlinks=False) and path.name != ".venv":
+        return _prepr_dir(name, path, **kwargs)
+    return name
+
+
+def _prepr_dir(name: str, path: Path, **kwargs) -> str:
+    indent: str = kwargs.get("indent", "")
+    middle = []
+    children = list(path.iterdir())
+    for i, child in enumerate(children):
+        last = i == len(children) - 1
+        pre_string = indent + (Char.TREE_BRANCH, Char.TREE_LAST)[last] + Char.TREE_LEAF
+        kws = kwargs | {"indent": indent + (Char.TREE_TRUNK + " ", "  ")[last]}
+        middle.append(f"{pre_string}{prepr_tree(child, **kws)}")
+    return "\n".join((name, *middle))
+
+
+def _style_file_name(path: Path, do_symlinks: bool = True) -> str:
+    name = path.name
+    style = "[file]"
+    if path.is_symlink():
+        style = "[symlink]"
+        if do_symlinks:
+            target = path.readlink()
+            parents = f"[dir]{target.parent}{os.path.sep}" if target.parent != Path() else ""
+            name += f"[d][nu] -> {parents}[/]{_style_file_name(target, False)}"
+    elif path.is_dir():
+        style = "[dir]"
+    elif name.endswith(".py") or name.endswith(".pyw"):
+        style = "[pyfile]"
+    if name.startswith("__"):
+        style += "[dunder_file]"
+    if name.startswith("."):
+        style += "[dotfile]"
+    return f"{style}{name}[/]"
+
+
+def _make_file_name(path: Path, **kwargs) -> str:
+    st = path.lstat()
+    size = kwargs.get("sizes", {}).get(path.as_posix(), st.st_size)
+    size_str = f"[filesize]{_format_bytes(size)}[/]"
+    mode_str = f"[filemode]{stat.filemode(st.st_mode)}[/]"
+    time_str = TIMESTAMP_TEMPLATE.format(*time.localtime(st.st_mtime)[:6])
+    return f"{_style_file_name(path)} {size_str} {mode_str} {time_str}"
+
+
 class Char:
     INDENT = "[indent]\u2502[/]"
     TREE_TRUNK = "[tree]\u2502[/]"
@@ -126,6 +176,15 @@ def _calculate_zipfile_sizes(zf: zipfile.ZipFile) -> Counter[str]:
     for info in zf.infolist():
         sizes[info.filename] += info.file_size
         sizes += {p.as_posix() + "/": info.file_size for p in Path(info.filename).parents}
+    return sizes
+
+
+def _calculate_dir_sizes(path: Path) -> Counter[str]:
+    sizes = Counter()
+    for child in path.rglob("*"):
+        size = child.lstat().st_size
+        sizes[child.as_posix()] += size
+        sizes += {p.as_posix(): size for p in child.parents}
     return sizes
 
 

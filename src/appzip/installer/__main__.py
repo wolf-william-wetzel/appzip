@@ -12,7 +12,7 @@ import venv
 from .metadata import Metadata
 from .console import Console
 from .folder import get_install_dir
-from .pretty import prepr
+from .pretty import prepr, prepr_tree
 from .utils import *
 
 START_TIME = time.perf_counter_ns()
@@ -190,6 +190,8 @@ def install():
     # Flag the installation as finished.
     log.debug("Writing flag file to %s", install_dir / FLAG_FILE)
     (install_dir / FLAG_FILE).touch()
+    # Log the entire file tree for debugging.
+    log.debug(prepr_tree(install_dir))
 
     # Exit message.
     runtime = dt.timedelta(microseconds=(time.perf_counter_ns() - START_TIME) / 1000)

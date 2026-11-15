@@ -42,7 +42,8 @@ class ThemeFormatter(logging.Formatter):
             record.levelname = f"{self.log_level_styles[level]}{level:<8}{self.theme.reset}"
         # Format the message.
         if not isinstance(record.msg, str):
-            record.msg = prepr(record.msg).replace("\n", "\n" + " " * 24)
+            record.msg = prepr(record.msg)
+        record.msg = record.msg.replace("\n", "\n" + " " * 24)
         # Format the args.
         if record.args:
             if isinstance(record.args, tuple):
