@@ -3,7 +3,7 @@ import os
 import subprocess
 import logging
 
-from .utils import Platform, getenv
+from .utils import Platform, getenv, run_pwsh_cmd
 
 log = logging.getLogger(__name__)
 
@@ -50,22 +50,10 @@ def _get_windows_folder(name: str) -> str | None:
         import winreg
     except ImportError:
         # Get from subprocess.
-        proc = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoLogo",
-                "-NonInteractive",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                f"[Environment]::GetFolderPath([Environment+SpecialFolder]::{name})",
-            ],
-            stdout=subprocess.PIPE,
-            text=True,
-        )
+        proc = run_pwsh_cmd(f"[Environment]::GetFolderPath([Environment+SpecialFolder]::{name})")
         return None if proc.returncode else proc.stdout
     try:
+        # Get from registry.
         sub_key = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
             return str(winreg.QueryValueEx(key, name)[0])

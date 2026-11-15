@@ -6,6 +6,7 @@ from zipfile import ZipFile
 import stat
 import shutil
 from functools import cache
+import subprocess
 
 __all__ = [
     "InstallerExit",
@@ -14,8 +15,10 @@ __all__ = [
     "UV_EXE",
     "LOG_LEVEL",
     "LOG_LEVELS",
-    "is_term",
+    "run_pwsh_cmd",
+    "run_pwsh_file",
     "rmtree",
+    "is_term",
     "can_interact",
     "can_colorize",
     "extract_subdir",
@@ -62,6 +65,28 @@ LOG_LEVEL = (getenv("LOGLEVEL") or getenv("LOG_LEVEL")).upper()
 LOG_LEVEL = {"CRITICAL": "FATAL", "WARNING": "WARN"}.get(LOG_LEVEL, LOG_LEVEL)
 if LOG_LEVEL not in LOG_LEVELS:
     LOG_LEVEL = "DEBUG" if getenv("DEBUG") else "WARN"
+
+
+def run_pwsh_cmd(command: str) -> subprocess.CompletedProcess[str]:
+    return _run_pwsh_process(["-Command", command])
+
+
+def run_pwsh_file(path: Path) -> subprocess.CompletedProcess[str]:
+    return _run_pwsh_process(["-File", str(path)])
+
+
+def _run_pwsh_process(args: list[str]) -> subprocess.CompletedProcess[str]:
+    if not Platform.IS_WIN:
+        raise NotImplementedError(f"PowerShell only available on Windows, not {Platform.NAME}")
+    return subprocess.run([
+        "powershell.exe",
+        "-NoLogo",
+        "-NonInteractive",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        *args,
+    ], capture_output=True, text=True)
 
 
 def rmtree(path: Path):

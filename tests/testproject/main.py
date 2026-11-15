@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
 import sys
+try:
+    import tkinter.messagebox as mb
+except ImportError:
+    mb = None
 
 
 def _main():
@@ -48,16 +52,21 @@ def _main():
     import tomli_w  # noqa
     print(f"Module loaded: {tomli_w.__file__}")
 
-    print("\nSuccessful run.")
-
 
 def main():
+    error = False
+    message = "Successful execution."
     try:
         _main()
     except BaseException as exc:
-        print(exc)
-    finally:
+        error = True
+        message = str(exc)
+    if mb:
+        (mb.showerror if error else mb.showinfo)("Program Termination", message)
+    else:
+        print("\n" + message)
         input("Press ENTER to quit...")
+    sys.exit(error)
 
 
 if __name__ == "__main__":
