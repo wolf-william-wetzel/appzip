@@ -11,7 +11,7 @@ import venv
 
 from .metadata import Metadata
 from .console import Console
-from .folder import get_install_dir
+from .folder import get_install_dir, get_bin_dir
 from .pretty import prepr, prepr_tree
 from .utils import *
 
@@ -182,10 +182,28 @@ def install():
 
     # Create entry points.
     console.status("Creating entry points...")
+    # Write the entry point script.
+    write_ep_script(venv_dir, app_dir, app_dir / md.base_name)
+    # Get the bin directory.
+    bin_dir = get_bin_dir()
+    log.debug("Bin dir: %s", bin_dir)
+    # Create the shortcuts.
     for ep in md.entry_points:
+        # Temporary python entry point scripts.
         name = f"{ep.name}.py{"w" if ep.windowed and Platform.IS_WIN else ""}"
-        log.debug(f"Creating entry point [{"l_blue" if ep.windowed else "l_green"}]{name}")
-        make_ep_file(install_dir / name, ep.get_file_text(venv_dir, app_dir / md.base_name))
+        style = f"[{"l_blue" if ep.windowed else "l_green"}]"
+        log.debug(f"Creating entry point {style}{name}")
+        write_executable_file(install_dir / name, ep.get_file_text(venv_dir, app_dir / md.base_name))
+        # Create console shortcuts.
+        if ep.console:
+            name = ep.name + ".bat" if Platform.IS_WIN else ep.name
+            log.debug(f"Creating console script {style}{name}")
+            write_console_script(
+                bin_dir / name,
+                app_dir / get_ep_script_name(ep.windowed),
+                ep.module,
+                ep.attr,
+            )
 
     # Flag the installation as finished.
     log.debug("Writing flag file to %s", install_dir / FLAG_FILE)

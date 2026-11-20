@@ -7,6 +7,7 @@ import stat
 import shutil
 from functools import cache
 import subprocess
+import shlex
 
 __all__ = [
     "InstallerExit",
@@ -15,6 +16,7 @@ __all__ = [
     "UV_EXE",
     "LOG_LEVEL",
     "LOG_LEVELS",
+    "get_ep_script_name",
     "run_pwsh_cmd",
     "run_pwsh_file",
     "rmtree",
@@ -23,7 +25,8 @@ __all__ = [
     "can_colorize",
     "extract_subdir",
     "write_ep_script",
-    "make_ep_file",
+    "write_executable_file",
+    "write_console_script",
     "get_python",
 ]
 
@@ -81,6 +84,13 @@ else:
 proc = subprocess.run(args + sys.argv[3:], cwd={cwd!r}, env=os.environ | dict(PYTHONSAFEPATH=""))
 sys.exit(proc.returncode)
 """ % EP_SCRIPT_MARKER
+EP_SCRIPT_NAME = "ep.py"
+EP_SCRIPT_NAME_W = "ep.pyw"
+EXTRA_ARGS_MARKER = "%*" if Platform.IS_WIN else '"$@"'
+
+
+def get_ep_script_name(windowed: bool = False):
+    return EP_SCRIPT_NAME_W if Platform.IS_WIN and windowed else EP_SCRIPT_NAME
 
 
 def run_pwsh_cmd(command: str) -> subprocess.CompletedProcess[str]:
@@ -202,16 +212,39 @@ def write_ep_script(venv_dir: Path | None, app_dir: Path, cwd_name: str):
 
 
 def _write_ep_script(venv_dir: Path | None, app_dir: Path, cwd_name: str, windowed: bool = False):
-    text = EP_SCRIPT.format(interpreter=get_python(venv_dir, windowed), cwd=app_dir / cwd_name)
-    with open(app_dir / f"ep{'w' if windowed else ''}", "w") as file:
-        file.write(text)
+    text = EP_SCRIPT.format(interpreter=get_python(venv_dir, windowed), cwd=str(app_dir / cwd_name))
+    write_executable_file(app_dir / (EP_SCRIPT_NAME_W if windowed else EP_SCRIPT_NAME), text)
 
 
-def make_ep_file(path: Path, text: str) -> None:
+def write_executable_file(path: Path, text: str) -> None:
     """Write ``text`` to ``path`` and make it executable."""
     with open(path, "w") as f:
         f.write(text)
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
+
+
+def quote_args(args: list[str | Path]) -> str:
+    if not Platform.IS_WIN:
+        return shlex.join(str(a) for a in args)
+    win_args = []
+    for i, arg in enumerate(args):
+        if i == 0 or isinstance(arg, Path):
+            arg = f'"{arg}"'
+        win_args.append(arg)
+    return " ".join(win_args)
+
+
+def write_console_script(path: Path, ep_script: Path, module: str, attr: str):
+    args: list[str | Path] = [
+        get_python(),
+        ep_script,
+        module,
+        attr or EP_SCRIPT_MARKER,
+        EXTRA_ARGS_MARKER,
+    ]
+    text = quote_args(args)
+    log.debug(f"Console script: [i]{text}")
+    write_executable_file(path, text)
 
 
 @cache
